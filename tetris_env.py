@@ -1,5 +1,6 @@
 import numpy as np
 import pygame as py
+from collections import deque
 
 class Block:
     # Make each block an enum
@@ -12,6 +13,9 @@ class Block:
     T = 6 # T shaped block
 
     def __init__(self, block_type):
+        if not (0 <= block_type <= 6):
+            raise Exception('Incorrect block type; use the global variables to safely set your block type')
+
         self.type = block_type
 
         # 0 deg: 0 | 90 deg: 1 | 180 deg: 2 | 270 deg: 3 (GOING CCW)
@@ -22,7 +26,7 @@ class Block:
         self.pos = self._spawn_pos
         
 
-    def flip(self, is_ccw_flip):
+    def flip(self, is_ccw_flip=False):
         # Handle if user flipped piece in the counter clockwise (CCW) direction
         if is_ccw_flip:
             self.flipped_status = self.flipped_status + 1 if self.flipped_status < 3 else 0
@@ -87,36 +91,20 @@ class Block:
                     return [(self.pos[0] + 1, self.pos[1] - 2), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1]), (self.pos[0], self.pos[1] - 1)]
 
 
-    def render(self, grid):
-        """
-        Tetris blocks have a "area of rotation", in which it facilitates rotation of the piece
-        More can be seen through this link: https://tetris.fandom.com/wiki/DTET_Rotation_System
-        """
-
-        match self.type:
-            case Block.O:
-                pass
-            case Block.I:
-                pass
-            case Block.S:
-                pass
-            case Block.Z:
-                pass
-            case Block.L:
-                pass
-            case Block.J:
-                pass
-            case Block.T:
-                pass
-
 class Tetris:
+
+    MOVE_CCW = 0
+    MOVE_CW = 1
+    MOVE_LEFT = 2
+    MOVE_RIGHT = 3
+
     def __init__(self):
         py.init()
 
-        # Screen size is a grid, Denote . as nothing, and # as a block 
-        self.grid = [[] for i in range(22)] # 10 * 20, with 2 unrendered rows at the top
-        self.grid_size = 30
-        self.screen_size = (10 * self.grid_size, 20 * self.grid_size)
+        # Screen size is a grid, Denote . as nothing, and # as a filled, and $ as a falling block
+        self.grid = [['.' for i in range(10)] for i in range(22)] # 10 * 20, with 2 unrendered rows at the top
+        self.cell_size = 30
+        self.screen_size = (10 * self.cell_size, 20 * self.cell_size)
         self.screen = py.display.set_mode(self.screen_size)
         py.display.set_caption('Mini Tetris Environment')
 
@@ -126,15 +114,107 @@ class Tetris:
         # Sprites on the screen have different timings. Use a frame counter
         self.frame_count = 0
 
+    def start(self):
+        """
+        Begins the tetris environment
+        """
+        # Keep a queue of blocks
+        self.block_queue = deque([Block(np.random.randint(0,7)) for i in range(3)], maxlen=3)
+
+        # Keep track of the controlled block
+        self.cycle_block()
+
+        pass
+
+    def cycle_block(self):
+        """
+        Pops out a block from the block_queue and adds a new random one in
+        """
+        self.controlled_block = self.block_queue.popleft()
+        self.block_queue.append(Block(np.random.randint(0,7)))
+
+    def move(self, type):
+        """
+        Make a move in tetris. There are four moves I will allow the environment to make: CCW turn, CW turn, and left and right movement of the block.
+        Typically allow a movement per frame, and the blocks will fall one block every 2 frames.
+        In the case of moving while the block is falling, the **falling will process first**, then the movement.
+
+        Args:
+            type: the type of movement that will be performed. Use the global variables at the very top
+        """
+
+        match type:
+            case Tetris.MOVE_CCW:
+                self.controlled_block.flip(True)
+
+                # TODO implement wall kicking
+                if not self.valid_pos(self.controlled_block.get_pixel_pos()):
+                    self.controlled_block.flip()
+            case Tetris.MOVE_CW:
+                self.controlled_block.flip()
+
+                # TODO implement wall kicking
+                if not self.valid_pos(self.controlled_block.get_pixel_pos()):
+                    self.controlled_block.flip(True)
+            case Tetris.MOVE_LEFT:
+                orig_pos = self.controlled_block.pos
+                self.controlled_block.pos = (self.controlled_block.pos[0] - 1, self.controlled_block.pos[1])
+
+                if not self.valid_pos(self.controlled_block.get_pixel_pos()):
+                    self.controlled_block.pos = orig_pos
+            case Tetris.MOVE_RIGHT:
+                orig_pos = self.controlled_block.pos
+                self.controlled_block.pos = (self.controlled_block.pos[0] + 1, self.controlled_block.pos[1])
+
+                if not self.valid_pos(self.controlled_block.get_pixel_pos()):
+                    self.controlled_block.pos = orig_pos
+            case _:
+                raise Exception(f"Invalid move type (from 0-3). Given type: {type}")
+
+    def fall(self):
+        """
+        Simulate the block falling by one block
+        """
+        orig_pos = self.controlled_block.pos
+        self.controlled_block.pos = (self.controlled_block.pos[0], self.controlled_block.pos[1] + 1)
+
+        if not self.valid_pos(self.controlled_block.get_pixel_pos()):
+            self.controlled_block.pos = orig_pos
+            # TODO Land block behavior
+
     def valid_pos(self, positions):
+        """
+        Given a set of coordinates, return a boolean indicating whether those coordinates don't collide with other blocks
+
+        Args:
+            positions: A list of positions to check over
+        """
+
         for pos in positions:
+            # If outta bounds
+            if not (0 <= pos[0] < 10) or not (0 <= pos[1] < 22):
+                return False
+            
+            # If colliding with another block
             if self.grid[pos[0], pos[1]] == "#":
                 return False
         
         return True
         
     def render(self):
-        self.screen.fill((255,0,0))
+        self.screen.fill((0,0,0))
+
+        # Draw the rendered rows (rows 2 - 22)
+        for i in range(20):
+            for j in range(10):
+                type = self.grid[i + 2][j]
+                if type == "#":
+                    #Draw a white square for each #
+                    py.draw.rect(self.screen, (255,255,255), (j * self.cell_size, i * self.cell_size, self.cell_size, self.cell_size))
+                elif type == "$":
+
+                    # Draw a red square for each $
+                    py.draw.rect(self.screen, (255,0,0), (j * self.cell_size, i * self.cell_size, self.cell_size, self.cell_size))
 
         # Render the screen as shown above and the framerate
         py.display.flip()
