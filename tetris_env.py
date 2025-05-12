@@ -21,8 +21,8 @@ class Block:
         # 0 deg: 0 | 90 deg: 1 | 180 deg: 2 | 270 deg: 3 (GOING CCW)
         self.flipped_status = 0
 
-        # Tetris is a 10*20 grid, specify spawn position as the bottom-left corner. Read coordinate left to right, top to bottom
-        self._spawn_pos = (4,1) if self.type == Block.O else (3,1)
+        # Tetris is a 22*10 grid (first two rows aren't shown), specify spawn position as the bottom-left corner. Read coordinate left to right, top to bottom
+        self._spawn_pos = (4,3) if self.type == Block.O else (3,3)
         self.pos = self._spawn_pos
         
 
@@ -101,7 +101,7 @@ class Tetris:
     def __init__(self):
         py.init()
 
-        # Screen size is a grid, Denote . as nothing, and # as a filled, and $ as a falling block
+        # Screen size is a grid, Denote . as nothing, and # as a filled
         self.grid = [['.' for i in range(10)] for i in range(22)] # 10 * 20, with 2 unrendered rows at the top
         self.cell_size = 30
         self.screen_size = (10 * self.cell_size, 20 * self.cell_size)
@@ -136,7 +136,7 @@ class Tetris:
     def move(self, type):
         """
         Make a move in tetris. There are four moves I will allow the environment to make: CCW turn, CW turn, and left and right movement of the block.
-        Typically allow a movement per frame, and the blocks will fall one block every 2 frames.
+        Typically allow a movement per frame, and the blocks will fall one block every 20gi frames.
         In the case of moving while the block is falling, the **falling will process first**, then the movement.
 
         Args:
@@ -180,7 +180,12 @@ class Tetris:
 
         if not self.valid_pos(self.controlled_block.get_pixel_pos()):
             self.controlled_block.pos = orig_pos
-            # TODO Land block behavior
+
+            # Land block behavior
+            for y, x in self.controlled_block.get_pixel_pos():
+                self.grid[x][y] = '#'
+            
+            self.cycle_block()
 
     def valid_pos(self, positions):
         """
@@ -196,7 +201,7 @@ class Tetris:
                 return False
             
             # If colliding with another block
-            if self.grid[pos[0], pos[1]] == "#":
+            if self.grid[pos[1]][pos[0]] == "#":
                 return False
         
         return True
@@ -211,10 +216,10 @@ class Tetris:
                 if type == "#":
                     #Draw a white square for each #
                     py.draw.rect(self.screen, (255,255,255), (j * self.cell_size, i * self.cell_size, self.cell_size, self.cell_size))
-                elif type == "$":
 
-                    # Draw a red square for each $
-                    py.draw.rect(self.screen, (255,0,0), (j * self.cell_size, i * self.cell_size, self.cell_size, self.cell_size))
+        # Draw the position of the controlled block
+        for x, y in self.controlled_block.get_pixel_pos():
+            py.draw.rect(self.screen, (255,0,0), (x * self.cell_size, (y-2) * self.cell_size, self.cell_size, self.cell_size))
 
         # Render the screen as shown above and the framerate
         py.display.flip()
@@ -222,7 +227,7 @@ class Tetris:
         # Framerate and counting
         self.clock.tick(60)
         self.frame_count = self.frame_count + 1 if self.frame_count < 59 else 0
-
+ 
     def close(self):
         """
         Quit the environment
@@ -231,12 +236,26 @@ class Tetris:
 
 if __name__ == "__main__":
     env = Tetris()
+    env.start()
 
     running = True
     while running:
         for event in py.event.get():
             if event.type == py.QUIT:
                 running = False
+            elif event.type == py.KEYDOWN:
+                if event.key == py.K_q:
+                    env.move(Tetris.MOVE_CCW)
+                if event.key == py.K_e:
+                    env.move(Tetris.MOVE_CW)
+                if event.key == py.K_a:
+                    env.move(Tetris.MOVE_LEFT)
+                if event.key == py.K_d:
+                    env.move(Tetris.MOVE_RIGHT)
+
+        # Falling behavior
+        if env.frame_count % 20 == 0:
+            env.fall()
 
         env.render()
     
