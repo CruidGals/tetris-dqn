@@ -133,6 +133,11 @@ class Tetris:
         self.controlled_block = self.block_queue.popleft()
         self.block_queue.append(Block(np.random.randint(0,7)))
 
+        # If the block spawns within a collision, game over!
+        if not self.valid_pos(self.controlled_block.get_pixel_pos()):
+            print("Game Over!")
+            self.close()
+
     def move(self, type):
         """
         Make a move in tetris. There are four moves I will allow the environment to make: CCW turn, CW turn, and left and right movement of the block.
@@ -205,6 +210,16 @@ class Tetris:
                 return False
         
         return True
+    
+    def clear_rows(self):
+        """
+        Clears any rows that are fully filled
+        """
+
+        for i in range(len(self.grid)):
+            if self.grid[i].count('#') == 10:
+                self.grid.pop(i)
+                self.grid.insert(0, ['.' for i in range(10)])
         
     def render(self):
         self.screen.fill((0,0,0))
@@ -254,8 +269,9 @@ if __name__ == "__main__":
                     env.move(Tetris.MOVE_RIGHT)
 
         # Falling behavior
-        if env.frame_count % 20 == 0:
+        if env.frame_count % 10 == 0:
             env.fall()
+            env.clear_rows()
 
         env.render()
     
