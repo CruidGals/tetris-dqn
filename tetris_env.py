@@ -175,6 +175,8 @@ class Tetris:
                     self.controlled_block.pos = orig_pos
             case _:
                 raise Exception(f"Invalid move type (from 0-3). Given type: {type}")
+        
+        return self._get_observation
 
     def fall(self):
         """
@@ -220,6 +222,42 @@ class Tetris:
             if self.grid[i].count('#') == 10:
                 self.grid.pop(i)
                 self.grid.insert(0, ['.' for i in range(10)])
+
+    # Environment specific functions
+    def reset(self):
+        """
+        Resets the environment for the next episode
+        """
+        self.grid = [['.' for i in range(10)] for i in range(22)]
+        self.frame_count = 0
+        self.block_queue = []
+
+        self.start()
+        return self._get_observation()
+
+    def _get_observation(self):
+        """
+        Returns the visual part of the grid, denoting '.' as 0, '#' as .5, and '$' as 1
+        """
+        temp_grid = self.grid[:, :]
+        positions = self.controlled_block.get_pixel_pos()
+
+        for y, x in positions:
+            self.temp_grid[x][y] = '$'
+
+        flattened_grid = temp_grid.flatten()
+
+        for i in range(len(flattened_grid)):
+            if flattened_grid[i] == '.':
+                flattened_grid[i] = 0
+            
+            if flattened_grid[i] == '#':
+                flattened_grid[i] = 0.5
+            
+            if flattened_grid[i] == '$':
+                flattened_grid[i] = 1.0
+        
+        return flattened_grid
         
     def render(self):
         self.screen.fill((0,0,0))
