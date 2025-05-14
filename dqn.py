@@ -1,14 +1,27 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from torch.optim import Adam
 import numpy as np
 from model import DQNModel
 from collections import deque
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 REPLAY_MEMORY_SIZE = 50_000
 
 class DQNAgent:
-    def __init__(self, input, output):
+    def __init__(self, input, output, action_size=4, learning_rate=1e-4, gamma=0.99, batch_size=128, 
+                 target_update=5, device='cpu'):
+        self.device = torch.device("cuda" if device == 'cuda' and torch.cuda.is_available() else "cpu")
+        self.action_size = action_size
+        self.lr = learning_rate
+        self.gamma = gamma
+        self.batch_size = batch_size
+        self.target_update = target_update
+
+        # Epsilon Decay information
+        self.epsilon = 1
+        self.epsilon_min = 0.1
+        self.decay_rate = 0.99
 
         # Main model that gets trained every step
         self.model = self.create_model(input, output)
@@ -21,30 +34,65 @@ class DQNAgent:
         # Instantiate replay memory
         self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
 
+        # NN stuff
+        self.optimizer = Adam()
+        self.loss = F.mse_loss
+
     def create_model(self, input, output) -> DQNModel:
         return DQNModel(input, output)
     
+    def update_epsilon(self):
+        self.epsilon = max(self.epsilon_min, self.epsilon * self.decay_rate)
+
     def update_replay_memory(self, transition):
         """
         Update the replay memory of the agent. If the replay memory is full, the transition is put onto the queue
         and the latest memory gets tossed.
+
+        Transition consists of (state, action, reward, next_state, done)
         """
         self.replay_memory.append(transition)
 
-    def get_qs(self, state, step):
+    def act(self, state):
         """
-        Get the Q-values based on the weights of the model
+        Get the Q-value based on the weights of the model
         """
 
         self.model.eval()
         result = None
 
         with torch.no_grad():
-            state_tensor = torch.from_numpy(np.array(state).reshape(-1, *state.shape) / 255).to(device)
-
-            # Get the predicted q value
-            result = self.model(state_tensor)[0]
-            print(f'Step {step}: Predicted Q-Values: {result}')
+            state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
+            result = self.model(state_tensor).argmax().item()
         
         self.model.train()
         return result
+    
+    def train(self):
+        """
+        Train the policy network
+        """
+        if len(self.replay_memory) < self.batch_size:
+            return
+        
+        # Get a random batch and store them into tensors
+        batch = np.random.sample(self.replay_memory, self.batch_size)
+
+        states = torch.FloatTensor(np.array(batch[0])).to(self.device)
+        actions = torch.FloatTensor(np.array(batch[1])).to(self.device)
+        rewards = torch.FloatTensor(np.array(batch[2])).to(self.device)
+        next_states = torch.FloatTensor(np.array(batch[3])).to(self.device)
+
+        # The "dones" array is to signify whether or not the episode is "completed"
+        dones = torch.FloatTensor(np.array(batch[4])).to(self.device)
+
+        curr_q_vals = self.model(states).gather(1, actions)
+
+        with torch.no_grad():
+            next_q_vals = self.target_model(next_states).max(1, keepdim=True)[0]
+            target_q_vals = rewards.unsqueeze(1) + (1 - dones.unsqueeze(1)) * self.gamma * next_q_vals
+        
+        loss = self.loss(curr_q_vals, target_q_vals)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
