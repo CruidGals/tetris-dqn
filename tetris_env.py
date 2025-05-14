@@ -176,7 +176,7 @@ class Tetris:
             case _:
                 raise Exception(f"Invalid move type (from 0-3). Given type: {type}")
         
-        return self._get_observation
+        return self._get_observation()
 
     def fall(self):
         """
@@ -239,11 +239,11 @@ class Tetris:
         """
         Returns the visual part of the grid, denoting '.' as 0, '#' as .5, and '$' as 1
         """
-        temp_grid = self.grid[:, :]
+        temp_grid = np.array(self.grid).copy()
         positions = self.controlled_block.get_pixel_pos()
 
         for y, x in positions:
-            self.temp_grid[x][y] = '$'
+            temp_grid[x][y] = '$'
 
         flattened_grid = temp_grid.flatten()
 
