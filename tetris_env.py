@@ -116,6 +116,9 @@ class Tetris:
         # Sprites on the screen have different timings. Use a frame counter
         self.frame_count = 0
 
+        # Keep track of state of game
+        self.done = False
+
     def start(self):
         """
         Begins the tetris environment
@@ -140,9 +143,9 @@ class Tetris:
         # If the block spawns within a collision, game over!
         if not self.valid_pos(self.controlled_block.get_pixel_pos()):
             print("Game Over!")
-            self.close()
+            self.done = True
         else:
-            reward = 0.05 # Reward staying alive for longer
+            reward = 0.001 # Reward staying alive for longer
         
         return reward
 
@@ -193,6 +196,7 @@ class Tetris:
         """
         orig_pos = self.controlled_block.pos
         self.controlled_block.pos = (self.controlled_block.pos[0], self.controlled_block.pos[1] + 1)
+        reward = 0
 
         if not self.valid_pos(self.controlled_block.get_pixel_pos()):
             self.controlled_block.pos = orig_pos
@@ -201,7 +205,9 @@ class Tetris:
             for y, x in self.controlled_block.get_pixel_pos():
                 self.grid[x][y] = '#'
             
-            self.cycle_block()
+            reward = self.cycle_block()
+
+        return reward
 
     def valid_pos(self, positions):
         """
@@ -247,6 +253,7 @@ class Tetris:
         Resets the environment for the next episode
         """
         self.grid = [['.' for i in range(10)] for i in range(22)]
+        self.done = False
         self.frame_count = 0
         self.block_queue = []
 
@@ -314,7 +321,7 @@ if __name__ == "__main__":
     running = True
     while running:
         for event in py.event.get():
-            if event.type == py.QUIT:
+            if event.type == py.QUIT or env.done:
                 running = False
             elif event.type == py.KEYDOWN:
                 if event.key == py.K_q:

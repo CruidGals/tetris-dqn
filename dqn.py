@@ -6,7 +6,7 @@ import numpy as np
 from model import DQNModel
 from collections import deque
 
-REPLAY_MEMORY_SIZE = 10_000
+REPLAY_MEMORY_SIZE = 50_000
 
 class DQNAgent:
     def __init__(self, input=200, output=4, action_size=4, learning_rate=1e-4, gamma=0.99, batch_size=256, 
