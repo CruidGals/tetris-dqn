@@ -2,6 +2,8 @@ import numpy as np
 import pygame as py
 from collections import deque
 
+FRAME_RATE = 360
+
 class Block:
     # Make each block an enum
     O = 0 # 2x2 block
@@ -130,6 +132,8 @@ class Tetris:
         """
         Pops out a block from the block_queue and adds a new random one in
         """
+        reward = 0
+
         self.controlled_block = self.block_queue.popleft()
         self.block_queue.append(Block(np.random.randint(0,7)))
 
@@ -137,6 +141,11 @@ class Tetris:
         if not self.valid_pos(self.controlled_block.get_pixel_pos()):
             print("Game Over!")
             self.close()
+        else:
+            reward = 0.05 # Reward staying alive for longer
+        
+        return reward
+
 
     def move(self, type):
         """
@@ -216,12 +225,21 @@ class Tetris:
     def clear_rows(self):
         """
         Clears any rows that are fully filled
+        If cleared 4 rows at once, give bonus points
         """
+        count = 0
 
         for i in range(len(self.grid)):
             if self.grid[i].count('#') == 10:
                 self.grid.pop(i)
                 self.grid.insert(0, ['.' for i in range(10)])
+                count += 1
+
+        # Give a reward for clearing rows
+        if count >= 4:
+            return 0.1
+
+        return 0.02 * count
 
     # Environment specific functions
     def reset(self):
@@ -245,7 +263,8 @@ class Tetris:
         for y, x in positions:
             temp_grid[x][y] = '$'
 
-        flattened_grid = temp_grid.flatten()
+        # Constrain to only the visual part of the grid
+        flattened_grid = temp_grid[2:, :].flatten()
 
         for i in range(len(flattened_grid)):
             if flattened_grid[i] == '.':
@@ -278,8 +297,8 @@ class Tetris:
         py.display.flip()
 
         # Framerate and counting
-        self.clock.tick(60)
-        self.frame_count = self.frame_count + 1 if self.frame_count < 59 else 0
+        self.clock.tick(FRAME_RATE)
+        self.frame_count = self.frame_count + 1 if self.frame_count < FRAME_RATE - 1 else 0
  
     def close(self):
         """
@@ -287,6 +306,7 @@ class Tetris:
         """
         py.quit()
 
+# For if the user would like to play on their own
 if __name__ == "__main__":
     env = Tetris()
     env.start()
@@ -306,8 +326,8 @@ if __name__ == "__main__":
                 if event.key == py.K_d:
                     env.move(Tetris.MOVE_RIGHT)
 
-        # Falling behavior
-        if env.frame_count % 10 == 0:
+        # Falling behavior (every 5 frames)
+        if env.frame_count % 5 == 0:
             env.fall()
             env.clear_rows()
 

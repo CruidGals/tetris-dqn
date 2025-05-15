@@ -6,10 +6,10 @@ import numpy as np
 from model import DQNModel
 from collections import deque
 
-REPLAY_MEMORY_SIZE = 50_000
+REPLAY_MEMORY_SIZE = 10_000
 
 class DQNAgent:
-    def __init__(self, input, output, action_size=4, learning_rate=1e-4, gamma=0.99, batch_size=128, 
+    def __init__(self, input=200, output=4, action_size=4, learning_rate=1e-4, gamma=0.99, batch_size=256, 
                  target_update=5, device='cpu'):
         self.device = torch.device("cuda" if device == 'cuda' and torch.cuda.is_available() else "cpu")
         self.action_size = action_size
@@ -41,7 +41,11 @@ class DQNAgent:
     def create_model(self, input, output) -> DQNModel:
         return DQNModel(input, output)
     
-    def update_epsilon(self):
+    def update(self):
+        # Update the target network with epsilon too
+        self.target_model.load_state_dict(self.model.state_dict())
+
+        # Do epsilon decay
         self.epsilon = max(self.epsilon_min, self.epsilon * self.decay_rate)
 
     def update_replay_memory(self, transition):
@@ -83,7 +87,7 @@ class DQNAgent:
         rewards = torch.FloatTensor(np.array(batch[2])).to(self.device)
         next_states = torch.FloatTensor(np.array(batch[3])).to(self.device)
 
-        # The "dones" array is to signify whether or not the episode is "completed"
+        # The "dones" array contains binary numbers that indicate whether if the next state stops the episode
         dones = torch.FloatTensor(np.array(batch[4])).to(self.device)
 
         curr_q_vals = self.model(states).gather(1, actions)
