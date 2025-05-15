@@ -1,15 +1,16 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.optim import Adam
 import numpy as np
+import random
+from torch.optim import Adam
 from model import DQNModel
 from collections import deque
 
 REPLAY_MEMORY_SIZE = 50_000
 
 class DQNAgent:
-    def __init__(self, input=200, output=4, action_size=4, learning_rate=1e-4, gamma=0.99, batch_size=256, 
+    def __init__(self, input=200, output=4, action_size=5, learning_rate=1e-4, gamma=0.99, batch_size=256, 
                  target_update=5, epsilon=1.0, epsilon_min=0.1, decay_rate=0.995, device='cpu'):
         self.device = torch.device("cuda" if device == 'cuda' and torch.cuda.is_available() else "cpu")
         self.action_size = action_size
@@ -24,17 +25,17 @@ class DQNAgent:
         self.decay_rate = decay_rate
 
         # Main model that gets trained every step
-        self.model = self.create_model(input, output)
+        self.model = self.create_model(input, output).to(self.device)
 
         # Target model updated every C steps, but is used for prediction against the actual model
-        self.target_model = self.create_model(input, output)
+        self.target_model = self.create_model(input, output).to(self.device)
         self.target_model.load_state_dict(self.model.state_dict())
 
         # Instantiate replay memory
         self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
 
         # NN stuff
-        self.optimizer = Adam()
+        self.optimizer = Adam(self.model.parameters())
         self.loss = F.mse_loss
 
     def create_model(self, input, output) -> DQNModel:
@@ -79,15 +80,16 @@ class DQNAgent:
             return
         
         # Get a random batch and store them into tensors
-        batch = np.random.sample(self.replay_memory, self.batch_size)
+        batch = random.sample(self.replay_memory, self.batch_size)
+        states, actions, rewards, next_states, dones = zip(*batch)
 
-        states = torch.FloatTensor(np.array(batch[0])).to(self.device)
-        actions = torch.FloatTensor(np.array(batch[1])).to(self.device)
-        rewards = torch.FloatTensor(np.array(batch[2])).to(self.device)
-        next_states = torch.FloatTensor(np.array(batch[3])).to(self.device)
+        states = torch.FloatTensor(np.array(states)).to(self.device)
+        actions = torch.LongTensor(np.array(actions)).unsqueeze(1).to(self.device)
+        rewards = torch.FloatTensor(np.array(rewards)).to(self.device)
+        next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
 
-        # The "dones" array contains binary numbers that indicate whether if the next state stops the episode
-        dones = torch.FloatTensor(np.array(batch[4])).to(self.device)
+        # The "dones" array contains booleans that indicate whether if the next state stops the episode
+        dones = torch.FloatTensor(np.array(dones)).to(self.device)
 
         curr_q_vals = self.model(states).gather(1, actions)
 

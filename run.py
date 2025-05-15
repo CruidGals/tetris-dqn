@@ -51,7 +51,7 @@ def train(config):
 
             done = env.done
             agent.update_replay_memory((state, action, reward, next_state, done))
-            loss = agent.train(state)
+            loss = agent.train()
             ep_loss += loss if loss else 0
             state = next_state
 

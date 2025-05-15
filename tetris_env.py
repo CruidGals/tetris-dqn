@@ -95,10 +95,11 @@ class Block:
 
 class Tetris:
 
-    MOVE_CCW = 0
-    MOVE_CW = 1
-    MOVE_LEFT = 2
-    MOVE_RIGHT = 3
+    MOVE_NONE = 0
+    MOVE_LEFT = 1
+    MOVE_RIGHT = 2
+    MOVE_CCW = 3
+    MOVE_CW = 4
 
     def __init__(self):
         py.init()
@@ -142,7 +143,6 @@ class Tetris:
 
         # If the block spawns within a collision, game over!
         if not self.valid_pos(self.controlled_block.get_pixel_pos()):
-            print("Game Over!")
             self.done = True
         else:
             reward = 0.001 # Reward staying alive for longer
@@ -185,6 +185,8 @@ class Tetris:
 
                 if not self.valid_pos(self.controlled_block.get_pixel_pos()):
                     self.controlled_block.pos = orig_pos
+            case Tetris.MOVE_NONE:
+                pass #Do nothing
             case _:
                 raise Exception(f"Invalid move type (from 0-3). Given type: {type}")
         
@@ -243,9 +245,9 @@ class Tetris:
 
         # Give a reward for clearing rows
         if count >= 4:
-            return 0.1
+            return 1
 
-        return 0.02 * count
+        return 0.2 * count
 
     # Environment specific functions
     def reset(self):
@@ -283,7 +285,7 @@ class Tetris:
             if flattened_grid[i] == '$':
                 flattened_grid[i] = 1.0
         
-        return flattened_grid
+        return flattened_grid.astype(float)
         
     def render(self):
         self.screen.fill((0,0,0))
@@ -321,7 +323,7 @@ if __name__ == "__main__":
     running = True
     while running:
         for event in py.event.get():
-            if event.type == py.QUIT or env.done:
+            if event.type == py.QUIT:
                 running = False
             elif event.type == py.KEYDOWN:
                 if event.key == py.K_q:
@@ -337,6 +339,9 @@ if __name__ == "__main__":
         if env.frame_count % 5 == 0:
             env.fall()
             env.clear_rows()
+
+        if env.done:
+            running=False
 
         env.render()
     
