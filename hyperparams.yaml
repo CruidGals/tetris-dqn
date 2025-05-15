@@ -1,0 +1,22 @@
+network:
+  input: 200
+  output: 4
+
+agent:
+  action_size: 4
+  learning_rate: 0.0001
+  gamma: 0.99
+  batch_size: 256
+  target_update_rate: 5
+  epsilon: 1.0
+  epsilon_min: 0.1
+  decay_rate: 0.995
+
+training:
+  episodes: 500
+  max_episode_length: 30 # Max episode length in seconds
+  render: True
+
+evaluation:
+  episodes: 10
+  max_episode_length: 60
