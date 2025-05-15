@@ -23,3 +23,15 @@ This is a tentative list of what I want to achieve with this project.
 - Complete the Tetris Environment (make sure it is fully functional)
 - Setup the reinforcement learning environment; assign rewards and penalties and a way for the network to interact with the game
 - Train and adjust hyperparameters
+
+## How to run
+
+If you want to run the training process with the DQN, first edit any hyperparameters in the `hyperparams.yaml` file, then run the command:
+```bash
+python run.py
+```
+
+If you want to play the tetris environment yourself, run the command:
+```bash
+python tetris_env.py
+```
