@@ -10,7 +10,7 @@ REPLAY_MEMORY_SIZE = 10_000
 
 class DQNAgent:
     def __init__(self, input=200, output=4, action_size=4, learning_rate=1e-4, gamma=0.99, batch_size=256, 
-                 target_update=5, device='cpu'):
+                 target_update=5, epsilon=1.0, epsilon_min=0.1, decay_rate=0.995, device='cpu'):
         self.device = torch.device("cuda" if device == 'cuda' and torch.cuda.is_available() else "cpu")
         self.action_size = action_size
         self.lr = learning_rate
@@ -19,9 +19,9 @@ class DQNAgent:
         self.target_update = target_update
 
         # Epsilon Decay information
-        self.epsilon = 1
-        self.epsilon_min = 0.1
-        self.decay_rate = 0.99
+        self.epsilon = epsilon
+        self.epsilon_min = epsilon_min
+        self.decay_rate = decay_rate
 
         # Main model that gets trained every step
         self.model = self.create_model(input, output)
@@ -29,7 +29,6 @@ class DQNAgent:
         # Target model updated every C steps, but is used for prediction against the actual model
         self.target_model = self.create_model(input, output)
         self.target_model.load_state_dict(self.model.state_dict())
-        self.target_update_counter = 0
 
         # Instantiate replay memory
         self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
