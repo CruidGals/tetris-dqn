@@ -2,7 +2,7 @@ import numpy as np
 import pygame as py
 from collections import deque
 
-FRAME_RATE = 360
+FRAME_RATE = 720
 
 class Block:
     # Make each block an enum
@@ -119,6 +119,7 @@ class Tetris:
 
         # Keep track of state of game
         self.done = False
+        self.landed_block_count = 0
 
     def start(self):
         """
@@ -129,7 +130,6 @@ class Tetris:
 
         # Keep track of the controlled block
         self.cycle_block()
-
         pass
 
     def cycle_block(self):
@@ -208,6 +208,7 @@ class Tetris:
                 self.grid[x][y] = '#'
             
             reward = self.cycle_block()
+            self.landed_block_count += 1
 
         return reward
 
@@ -245,9 +246,9 @@ class Tetris:
 
         # Give a reward for clearing rows
         if count >= 4:
-            return 1
+            return 5.0
 
-        return 0.2 * count
+        return 1.0 * count
 
     # Environment specific functions
     def reset(self):
@@ -258,6 +259,7 @@ class Tetris:
         self.done = False
         self.frame_count = 0
         self.block_queue = []
+        self.landed_block_count = 0
 
         self.start()
         return self._get_observation()

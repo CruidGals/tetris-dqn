@@ -65,12 +65,10 @@ def train(config):
             curr_time = time.time()
 
         best_reward = max(best_reward, total_reward)
-        stop_time = time.time()
-        episode_length = stop_time - start_time
 
         # Update the epsilon and critic model after every episode
         agent.update()
-        print(f"Episode: {i}; Reward: {total_reward:.2f}; Loss: {ep_loss:.2f};Epsilon: {agent.epsilon:.2f}; Time{episode_length:.2f}")
+        print(f"Episode: {i}; Reward: {total_reward:.2f}; Loss: {ep_loss}; Epsilon: {agent.epsilon:.2f}; Landed: {env.landed_block_count:.2f}")
 
     return agent, env
         
