@@ -11,7 +11,7 @@ REPLAY_MEMORY_SIZE = 50_000
 
 class DQNAgent:
     def __init__(self, input=200, output=4, action_size=5, learning_rate=1e-4, gamma=0.99, batch_size=256, 
-                 target_update=5, epsilon=1.0, epsilon_min=0.1, decay_rate=0.995, device='cpu'):
+                 target_update=10, epsilon=1.0, epsilon_min=0.1, decay_rate=0.995, device='cpu'):
         self.device = torch.device("cuda" if device == 'cuda' and torch.cuda.is_available() else "cpu")
         self.action_size = action_size
         self.lr = learning_rate
@@ -30,9 +30,14 @@ class DQNAgent:
         # Target model updated every C steps, but is used for prediction against the actual model
         self.target_model = self.create_model(input, output).to(self.device)
         self.target_model.load_state_dict(self.model.state_dict())
+        self.target_update = target_update
+        self.target_update_counter = 0
 
         # Instantiate replay memory
         self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
+
+        # Used for performance-based epsilon decay
+        self.recent_rewards = deque(maxlen=100)
 
         # NN stuff
         self.optimizer = Adam(self.model.parameters())
@@ -42,20 +47,38 @@ class DQNAgent:
         return DQNModel(input, output)
     
     def update(self):
+        self.update_target_model()
+
+        # Do epsilon decay
+        recent_rewards_list = list(self.recent_rewards)
+        rewards = recent_rewards_list[-50:] if len(recent_rewards_list) >= 50 else recent_rewards_list
+        recent_mean = np.mean(rewards[-25:])
+        old_mean = np.mean(rewards[:25])
+
+        if recent_mean > old_mean:
+            self.epsilon = max(self.epsilon_min, self.epsilon * self.decay_rate)
+
+    def update_target_model(self):
+        # Make sure to update once hit target update
+        if self.target_update_counter < self.target_update:
+            self.target_update_counter += 1
+            return
+
+        self.target_update_counter = 0
+
         # Update the target network with epsilon too
         self.target_model.load_state_dict(self.model.state_dict())
 
-        # Do epsilon decay
-        self.epsilon = max(self.epsilon_min, self.epsilon * self.decay_rate)
 
-    def update_replay_memory(self, transition):
+    def remember(self, transition):
         """
         Update the replay memory of the agent. If the replay memory is full, the transition is put onto the queue
-        and the latest memory gets tossed.
+        and the latest memory gets tossed. Also updates the recent rewards for epsilon decay
 
         Transition consists of (state, action, reward, next_state, done)
         """
         self.replay_memory.append(transition)
+        self.recent_rewards.append(transition[2])
 
     def act(self, state):
         """
