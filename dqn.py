@@ -51,9 +51,12 @@ class DQNAgent:
 
         # Do epsilon decay
         recent_rewards_list = list(self.recent_rewards)
+
+        idx_check = 25 if len(recent_rewards_list) >= 50 else len(recent_rewards_list) // 2
+
         rewards = recent_rewards_list[-50:] if len(recent_rewards_list) >= 50 else recent_rewards_list
-        recent_mean = np.mean(rewards[-25:])
-        old_mean = np.mean(rewards[:25])
+        recent_mean = np.mean(rewards[-idx_check:])
+        old_mean = np.mean(rewards[:idx_check])
 
         if recent_mean > old_mean:
             self.epsilon = max(self.epsilon_min, self.epsilon * self.decay_rate)
