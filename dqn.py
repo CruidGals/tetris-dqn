@@ -10,7 +10,7 @@ from collections import deque
 REPLAY_MEMORY_SIZE = 50_000
 
 class DQNAgent:
-    def __init__(self, input=200, output=4, action_size=5, learning_rate=1e-4, gamma=0.99, batch_size=256, 
+    def __init__(self, input=200, output=5, action_size=5, learning_rate=1e-4, gamma=0.99, batch_size=256, 
                  target_update=10, epsilon=1.0, epsilon_min=0.1, decay_rate=0.995):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.action_size = action_size
@@ -88,16 +88,12 @@ class DQNAgent:
         """
         Get the Q-value based on the weights of the model
         """
-
-        self.model.eval()
-        result = None
+        if np.random.rand() < self.epsilon:
+            return np.random.randint(0, self.action_size)
 
         with torch.no_grad():
             state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
-            result = self.model(state_tensor).argmax().item()
-        
-        self.model.train()
-        return result
+            return self.model(state_tensor).argmax().item()
     
     def train(self):
         """
@@ -130,3 +126,10 @@ class DQNAgent:
         self.optimizer.step()
 
         return loss
+    
+    def save(self, path):
+        torch.save(self.model.state_dict(), path)
+    
+    def load(self, path):
+        self.model.load_state_dict(torch.load(path))
+        self.target_model.load_state_dict(self.model.state_dict())
