@@ -37,7 +37,7 @@ class DQNAgent:
         self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
 
         # Used for performance-based epsilon decay
-        self.recent_rewards = deque(maxlen=55)
+        self.recent_rewards = deque(maxlen=100)
 
         # NN stuff
         self.optimizer = Adam(self.model.parameters())
@@ -59,8 +59,7 @@ class DQNAgent:
         recent_mean = np.mean(rewards[-25:])
         old_mean = np.mean(rewards[:25])
 
-        # Heavily encourage breaking blocks
-        if recent_mean > old_mean * 1.5:
+        if recent_mean > old_mean:
             self.epsilon = max(self.epsilon_min, self.epsilon * self.decay_rate)
 
     def update_target_model(self):

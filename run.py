@@ -54,7 +54,6 @@ def train(config):
             # Falling behavior (every 5 frames)
             if env.clock.frame_count % 4 == 0:
                 reward += env.fall()
-                reward += env.clear_rows()
 
             total_reward += reward
 
@@ -78,7 +77,7 @@ def train(config):
 
         # Update the epsilon and critic model after every episode
         agent.update()
-        print(f"Episode: {i}; Reward: {total_reward:.2f}; Loss: {ep_loss}; Epsilon: {agent.epsilon:.2f}; Landed: {env.landed_block_count:.2f}")
+        print(f"Episode: {i}; Reward: {total_reward:.3f}; Epsilon: {agent.epsilon:.2f}; Landed: {env.landed_block_count}; Loss/per: {(ep_loss / env.landed_block_count):.2f}")
 
     return agent, env
         

@@ -161,10 +161,6 @@ class Tetris:
         # If the block spawns within a collision, game over!
         if not self.valid_pos(self.controlled_block.get_pixel_pos()):
             self.done = True
-        else:
-            reward = 0.001 # Reward staying alive for longer
-        
-        return reward
 
 
     def move(self, type):
@@ -224,7 +220,9 @@ class Tetris:
             for y, x in self.controlled_block.get_pixel_pos():
                 self.grid[x][y] = '#'
             
-            reward = self.cycle_block()
+            self.cycle_block()
+            reward = self.distribute_reward()
+            self.clear_rows()
             self.landed_block_count += 1
 
         return reward
@@ -260,12 +258,6 @@ class Tetris:
                 self.grid.pop(i)
                 self.grid.insert(0, ['.' for i in range(10)])
                 count += 1
-
-        # Give a reward for clearing rows
-        if count >= 4:
-            return 5.0
-
-        return 1.0 * count
 
     # Environment specific functions
     def reset(self):
@@ -305,7 +297,41 @@ class Tetris:
                 flattened_grid[i] = 1.0
         
         return flattened_grid.astype(float)
-        
+    
+    def distribute_reward(self):
+        """
+        Distribute the reward after a block lands (counts as one step in this environment).
+        Features rewards such as: survival (low), clearing rows (big), encouraging flatter structure (moderate), penalizing holes, encouraging lower height
+        """
+        reward = 0
+
+        # Survival reward
+        reward += 0.005
+
+        # Clear rows reward
+        for row in self.grid:
+            # A full row is cleared
+            if row.count('#') == 10:
+                # Decrease or increase based on performance
+                reward += 5
+
+        # Encourage flatter structure by penalizing empty spots in rows that have landed regions in it (will need to adjust heavily)
+        # Also keep track of highest row that contains a landed block
+        highest_row = -1
+
+        for i, row in enumerate(self.grid):
+            if '#' in row:
+                if highest_row == -1:
+                    highest_row = 21 - i
+
+                reward -= row.count('.') * 0.001
+
+        # Penalize height
+        reward -= highest_row * 0.01
+
+        return reward
+
+    # Pygame specific    
     def render(self):
         if not self.use_pygame:
             return
