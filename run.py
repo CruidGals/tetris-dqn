@@ -19,10 +19,10 @@ def train(config):
         target_update=config['agent']['target_update_rate'],
         epsilon=config['agent']['epsilon'],
         epsilon_min=config['agent']['epsilon_min'],
-        decay_rate=config['agent']['decay_rate'],
+        decay_rate=config['agent']['decay_rate']
     )
 
-    env = Tetris()
+    env = Tetris(use_pygame=config['training']['render'])
     best_reward = -np.inf
 
     # Begin training
@@ -33,17 +33,26 @@ def train(config):
 
         # Run episode until max length of ~30 seconds
         start_time = time.time()
-        curr_time = start_time
+        prev_time = start_time
         max_time = config['training']['max_episode_length']
 
-        while curr_time - start_time < max_time:
+        while prev_time - start_time < max_time:
+            curr_time = time.time()
+
+            # Make a move every millisecond
+            if curr_time - prev_time < 1/1000:
+                continue
+            
+            # Update current_time
+            prev_time = curr_time
+
             # Start the training process
             reward = 0
             action = agent.act(state)
             next_state = env.move(action)
 
             # Falling behavior (every 5 frames)
-            if env.frame_count % 5 == 0:
+            if env.clock.frame_count % 4 == 0:
                 reward += env.fall()
                 reward += env.clear_rows()
 
@@ -51,8 +60,12 @@ def train(config):
 
             done = env.done
             agent.remember((state, action, reward, next_state, done))
-            loss = agent.train()
-            ep_loss += loss if loss else 0
+
+            # Train less frequently
+            if env.clock.frame_count % 4 == 0:
+                loss = agent.train()
+                ep_loss += loss if loss else 0
+            
             state = next_state
 
             if config['training']['render']:
@@ -60,9 +73,6 @@ def train(config):
 
             if done:
                 break
-            
-            # Update current time
-            curr_time = time.time()
 
         best_reward = max(best_reward, total_reward)
 

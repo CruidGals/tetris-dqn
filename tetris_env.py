@@ -1,9 +1,24 @@
 import numpy as np
 import pygame as py
+import time
+import sys
 from collections import deque
 
-FRAME_RATE = 720
+class Clock:
+    def __init__(self, frame_rate):
+        self.frame_rate = frame_rate
+        self.prev_time = time.time()
+        self.frame_count = 0
 
+    def tick(self):
+        current_time = time.time()
+        
+        if current_time - self.prev_time >= (1/self.frame_rate):
+            self.frame_count += 1
+            self.prev_time = current_time
+
+        if self.frame_count == self.frame_rate:
+            self.frame_count = 0
 class Block:
     # Make each block an enum
     O = 0 # 2x2 block
@@ -101,22 +116,24 @@ class Tetris:
     MOVE_CCW = 3
     MOVE_CW = 4
 
-    def __init__(self):
-        py.init()
+    def __init__(self, frame_rate=250, use_pygame=True):
+        self.use_pygame = use_pygame 
 
         # Screen size is a grid, Denote . as nothing, and # as a filled
         self.grid = [['.' for i in range(10)] for i in range(22)] # 10 * 20, with 2 unrendered rows at the top
         self.cell_size = 30
         self.screen_size = (10 * self.cell_size, 20 * self.cell_size)
-        self.screen = py.display.set_mode(self.screen_size)
-        py.display.set_caption('Mini Tetris Environment')
 
-        # Set a clock for tetris
-        self.clock = py.time.Clock()
+        # Set up a clock to control falling
+        self.clock = Clock(frame_rate=frame_rate)
 
-        # Sprites on the screen have different timings. Use a frame counter
-        self.frame_count = 0
+        if self.use_pygame:
+            py.init()
+            self.screen = py.display.set_mode(self.screen_size)
+            py.display.set_caption('Mini Tetris Environment')
 
+            self.game_clock = py.time.Clock()
+        
         # Keep track of state of game
         self.done = False
         self.landed_block_count = 0
@@ -290,6 +307,15 @@ class Tetris:
         return flattened_grid.astype(float)
         
     def render(self):
+        if not self.use_pygame:
+            return
+        
+        for event in py.event.get():
+            if event.type == py.QUIT:
+                py.quit()
+                self.use_pygame = False
+                return
+
         self.screen.fill((0,0,0))
 
         # Draw the rendered rows (rows 2 - 22)
@@ -308,18 +334,18 @@ class Tetris:
         py.display.flip()
 
         # Framerate and counting
-        self.clock.tick(FRAME_RATE)
-        self.frame_count = self.frame_count + 1 if self.frame_count < FRAME_RATE - 1 else 0
+        self.game_clock.tick(60)
  
     def close(self):
         """
         Quit the environment
         """
-        py.quit()
+        if self.use_pygame:
+            py.quit()
 
 # For if the user would like to play on their own
 if __name__ == "__main__":
-    env = Tetris()
+    env = Tetris(use_pygame=True)
     env.start()
 
     running = True
@@ -337,8 +363,8 @@ if __name__ == "__main__":
                 if event.key == py.K_d:
                     env.move(Tetris.MOVE_RIGHT)
 
-        # Falling behavior (every 5 frames)
-        if env.frame_count % 5 == 0:
+        # Falling behavior (every 4 frames)
+        if env.clock.frame_count % 4 == 0:
             env.fall()
             env.clear_rows()
 

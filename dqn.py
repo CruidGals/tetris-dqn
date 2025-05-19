@@ -11,8 +11,8 @@ REPLAY_MEMORY_SIZE = 50_000
 
 class DQNAgent:
     def __init__(self, input=200, output=4, action_size=5, learning_rate=1e-4, gamma=0.99, batch_size=256, 
-                 target_update=10, epsilon=1.0, epsilon_min=0.1, decay_rate=0.995, device='cpu'):
-        self.device = torch.device("cuda" if device == 'cuda' and torch.cuda.is_available() else "cpu")
+                 target_update=10, epsilon=1.0, epsilon_min=0.1, decay_rate=0.995):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.action_size = action_size
         self.lr = learning_rate
         self.gamma = gamma
@@ -37,7 +37,7 @@ class DQNAgent:
         self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
 
         # Used for performance-based epsilon decay
-        self.recent_rewards = deque(maxlen=100)
+        self.recent_rewards = deque(maxlen=55)
 
         # NN stuff
         self.optimizer = Adam(self.model.parameters())
@@ -49,16 +49,18 @@ class DQNAgent:
     def update(self):
         self.update_target_model()
 
+        # Don't update epsilon until recent rewards has at least 50 items in it
+        if len(self.recent_rewards) < 50:
+            return
+
         # Do epsilon decay
         recent_rewards_list = list(self.recent_rewards)
+        rewards = recent_rewards_list[-50:]
+        recent_mean = np.mean(rewards[-25:])
+        old_mean = np.mean(rewards[:25])
 
-        idx_check = 25 if len(recent_rewards_list) >= 50 else len(recent_rewards_list) // 2
-
-        rewards = recent_rewards_list[-50:] if len(recent_rewards_list) >= 50 else recent_rewards_list
-        recent_mean = np.mean(rewards[-idx_check:])
-        old_mean = np.mean(rewards[:idx_check])
-
-        if recent_mean > old_mean:
+        # Heavily encourage breaking blocks
+        if recent_mean > old_mean * 1.5:
             self.epsilon = max(self.epsilon_min, self.epsilon * self.decay_rate)
 
     def update_target_model(self):
