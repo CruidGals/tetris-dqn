@@ -2,6 +2,7 @@ import yaml
 import argparse
 import time
 import numpy as np
+import os
 from dqn import DQNAgent
 from tetris_env import Tetris
 
@@ -9,6 +10,14 @@ def train(config):
     """
     Train the agent based on the hyperparameters
     """
+    timestamp = time.strftime('%H%d%m%Y')
+    result_dir = os.path.join('results/models', f"experiement_{timestamp}")
+    os.makedirs(result_dir, exist_ok=True)
+
+    # Save config file
+    with open(os.path.join(result_dir, 'config.yaml'), 'w') as f:
+        yaml.dump(config, f)
+
     agent = DQNAgent(
         input=config['network']['input'],
         output=config['network']['output'],
@@ -24,6 +33,7 @@ def train(config):
 
     env = Tetris(use_pygame=config['training']['render'])
     best_reward = -np.inf
+    best_episode = 0
 
     # Begin training
     for i in range(config['training']['episodes']):
@@ -55,10 +65,16 @@ def train(config):
             if env.clock.frame_count % 4 == 0:
                 reward += env.fall()
 
-            total_reward += reward
+            if config['training']['render']:
+                env.render()
 
             done = env.done
+            reward += 0.1
+            total_reward += reward
             agent.remember((state, action, reward, next_state, done))
+
+            if done:
+                break
 
             # Train less frequently
             if env.clock.frame_count % 4 == 0:
@@ -67,17 +83,22 @@ def train(config):
             
             state = next_state
 
-            if config['training']['render']:
-                env.render()
-
-            if done:
-                break
-
-        best_reward = max(best_reward, total_reward)
+        if total_reward > best_reward:
+            best_reward = total_reward
+            best_episode = i
 
         # Update the epsilon and critic model after every episode
         agent.update()
         print(f"Episode: {i}; Reward: {total_reward:.3f}; Epsilon: {agent.epsilon:.2f}; Landed: {env.landed_block_count}; Loss/per: {(ep_loss / env.landed_block_count):.2f}")
+        
+        # Save after every 500 episodes (even the 0th)
+        if i % 500 == 0:
+            agent.save(os.path.join(result_dir, f"model_{i}.pth"))
+    
+    print(f"Best reward: {best_reward}; Best episode: {best_episode}")
+
+    # Save the overall agent
+    agent.save(os.path.join(result_dir, 'model_5000.pth'))
 
     return agent, env
         
