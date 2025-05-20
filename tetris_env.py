@@ -305,9 +305,6 @@ class Tetris:
         """
         reward = 0
 
-        # Survival reward
-        reward += 0.005
-
         # Clear rows reward
         for row in self.grid:
             # A full row is cleared
@@ -315,21 +312,66 @@ class Tetris:
                 # Decrease or increase based on performance
                 reward += 5
 
-        # Encourage flatter structure by penalizing empty spots in rows that have landed regions in it (will need to adjust heavily)
-        # Also keep track of highest row that contains a landed block
-        highest_row = -1
-
-        for i, row in enumerate(self.grid):
-            if '#' in row:
-                if highest_row == -1:
-                    highest_row = 21 - i
-
-                reward -= row.count('.') * 0.001
-
         # Penalize height
-        reward -= highest_row * 0.01
+        highest_row = -1
+        for i, row in enumerate(self.grid):
+            if '#' in row and highest_row == -1:
+                highest_row = i
+                break 
 
-        return reward
+        reward -= (21 - highest_row) * 0.01
+
+        # Find holes and penalize them
+        seen_blocks = set()
+        hole_blocks = set()
+
+        for i, row in enumerate(self.grid[highest_row+1:]):
+            if '.' not in row:
+                continue
+            
+            first_empty = row.index('.')
+            if (first_empty, highest_row + 1 + i) in seen_blocks:
+                continue
+
+            propogated_blocks = set()
+
+            if self.is_hole(first_empty, highest_row + 1 + i, highest_row + 1, propogated_blocks):
+                hole_blocks.update(propogated_blocks)
+                
+            seen_blocks.update(propogated_blocks)
+
+        reward -= len(hole_blocks) * 0.1
+
+        # Penalize dying early
+        if self.done:
+            reward -= np.exp(-(self.landed_block_count-10) // 10) * 5
+
+        return reward * 1000 # Helps stabilize really small rewards
+
+    def is_hole(self, x, y, highest_row, seen_blocks):
+        """
+        Determines whether or not a space is a "hole" based on the starting location.
+        A hole is defined as empty space that cannot be reached without clearing any rows.
+        We can find holes by propogating outwards until we reach the very top of the grid
+        (or in this case, the top of the highest row that contains a landed block).
+        """
+        seen_blocks.add((x,y))
+
+        left, right, up, down = True, True, True, True
+
+        if y == highest_row:
+            return False
+
+        if (x != 0 and self.grid[y][x-1] != '#') and not (x-1, y) in seen_blocks:
+            left = self.is_hole(x-1, y, highest_row, seen_blocks)
+        if (x != 9 and self.grid[y][x+1] != '#') and not (x+1, y) in seen_blocks:
+            right = self.is_hole(x+1, y, highest_row, seen_blocks)
+        if (y != 21 and self.grid[y+1][x] != '#') and not (x, y+1) in seen_blocks:
+            down = self.is_hole(x, y+1, highest_row, seen_blocks)
+        if (y > highest_row and self.grid[y-1][x] != '#') and not (x, y-1) in seen_blocks:
+            up = self.is_hole(x, y-1, highest_row, seen_blocks)
+
+        return left and right and down and up
 
     # Pygame specific    
     def render(self):
@@ -371,6 +413,57 @@ class Tetris:
 
 # For if the user would like to play on their own
 if __name__ == "__main__":
+    # # Test code
+    # env = Tetris(use_pygame=False)
+
+    # tetris_grid = [
+    #     ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # row 0 (top)
+    #     ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 1
+    #     ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 2
+    #     ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 3
+    #     ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 4
+    #     ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 5
+    #     ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 6
+    #     ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 7
+    #     ['#', '.', '#', '.', '.', '.', '.', '.', '.', '.'],  # 8
+    #     ['#', '#', '#', '.', '.', '#', '.', '.', '.', '.'],  # 9
+    #     ['#', '.', '#', '.', '#', '#', '.', '.', '.', '.'],  # 10
+    #     ['#', '.', '#', '#', '#', '#', '#', '#', '#', '.'],  # 11
+    #     ['#', '#', '#', '#', '#', '#', '.', '.', '#', '.'],  # 12
+    #     ['#', '#', '#', '#', '#', '#', '#', '.', '#', '.'],
+    #     ['#', '#', '#', '#', '#', '#', '#', '.', '#', '.'],
+    #     ['#', '#', '.', '#', '#', '#', '.', '.', '#', '.'],
+    #     ['#', '#', '.', '#', '#', '#', '.', '.', '#', '.'],
+    #     ['#', '#', '#', '#', '#', '#', '.', '.', '#', '#'],
+    #     ['#', '#', '#', '#', '#', '#', '.', '.', '#', '#'],
+    #     ['#', '#', '#', '#', '#', '#', '.', '.', '#', '#'],
+    #     ['#', '#', '#', '#', '#', '#', '#', '.', '#', '#'],
+    #     ['#', '#', '#', '#', '#', '#', '#', '#', '#', '#'],  # row 21 (bottom)
+    # ]
+
+    # env.grid = tetris_grid
+    
+    # seen_blocks = set()
+    # hole_blocks = set()
+
+    # for i, row in enumerate(env.grid[9:]):
+    #     if '.' not in row:
+    #         continue
+
+    #     first_empty = row.index('.')
+    #     if (first_empty, 9 + i) in seen_blocks:
+    #         continue
+
+    #     propogated_blocks = set()
+
+    #     if env.is_hole(first_empty, 9 + i, 9, propogated_blocks):
+    #         hole_blocks.update(propogated_blocks)
+            
+    #     seen_blocks.update(propogated_blocks)
+
+    # print(seen_blocks)
+    # print(hole_blocks)
+
     env = Tetris(use_pygame=True)
     env.start()
 
