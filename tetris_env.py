@@ -277,26 +277,19 @@ class Tetris:
         """
         Returns the visual part of the grid, denoting '.' as 0, '#' as .5, and '$' as 1
         """
-        temp_grid = np.array(self.grid).copy()
-        positions = self.controlled_block.get_pixel_pos()
 
-        for y, x in positions:
-            temp_grid[x][y] = '$'
+        transformed_grid = np.array(self.grid).copy()
 
-        # Constrain to only the visual part of the grid
-        flattened_grid = temp_grid[2:, :].flatten()
+        # Turn empty spaces '.' into 0, and filled spaces '#' into 1
+        mapping = {'.': 0, '#': 1}
+        transformed_grid = np.vectorize(lambda x: mapping[x])(transformed_grid).astype('float64')
 
-        for i in range(len(flattened_grid)):
-            if flattened_grid[i] == '.':
-                flattened_grid[i] = 0
-            
-            if flattened_grid[i] == '#':
-                flattened_grid[i] = 0.5
-            
-            if flattened_grid[i] == '$':
-                flattened_grid[i] = 1.0
-        
-        return flattened_grid.astype(float)
+        # Fill in falling block as 0.5
+        for y, x in self.controlled_block.get_pixel_pos():
+            transformed_grid[x][y] = 0.5
+
+        # Constrin to visual part of grid
+        return transformed_grid[2:, :].flatten()
     
     def distribute_reward(self):
         """
@@ -319,34 +312,27 @@ class Tetris:
                 highest_row = i
                 break 
 
-        reward -= (21 - highest_row) * 0.01
+        reward -= (21 - highest_row) ** 1.5 * 0.01
 
         # Find holes and penalize them
-        seen_blocks = set()
-        hole_blocks = set()
+        holes = 0
 
-        for i, row in enumerate(self.grid[highest_row+1:]):
-            if '.' not in row:
-                continue
-            
-            first_empty = row.index('.')
-            if (first_empty, highest_row + 1 + i) in seen_blocks:
-                continue
-
-            propogated_blocks = set()
-
-            if self.is_hole(first_empty, highest_row + 1 + i, highest_row + 1, propogated_blocks):
-                hole_blocks.update(propogated_blocks)
-                
-            seen_blocks.update(propogated_blocks)
-
-        reward -= len(hole_blocks) * 0.1
+        for col in range(10):
+            block_found = False
+            for row in range(22):
+                if self.grid[row][col] == '#':
+                    block_found = True
+                elif self.grid[row][col] == '.' and block_found:
+                    holes += 1
+        
+        reward -= holes * 0.05
+        
 
         # Penalize dying early
         if self.done:
-            reward -= np.exp(-(self.landed_block_count-10) // 10) * 5
+            reward -= np.exp(-(self.landed_block_count-10) / 10) * 5
 
-        return reward * 1000 # Helps stabilize really small rewards
+        return reward 
 
     def is_hole(self, x, y, highest_row, seen_blocks):
         """
