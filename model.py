@@ -5,10 +5,15 @@ class DQNModel(nn.Module):
     def __init__(self, input, output):
         super(DQNModel, self).__init__()
 
-        self.net = nn.Sequential(nn.Linear(input, 512), nn.ReLU(), nn.Dropout(0.3),
-                                 nn.Linear(512, 256), nn.ReLU(), nn.Dropout(0.3),
-                                 nn.Linear(256, 64), nn.ReLU(), nn.Dropout(0.2),
+        self.net = nn.Sequential(nn.Linear(input, 128), nn.ReLU(),
+                                 nn.Linear(128, 64), nn.ReLU(),
                                  nn.Linear(64, output))
+
+        # self.net = nn.Sequential(nn.Conv2d(1, 16, kernel_size=3, padding=1), nn.ReLU(),
+        #                          nn.Conv2d(16, 32, kernel_size=3, padding=1), nn.ReLU(),     
+        #                          nn.Flatten(),
+        #                          nn.Linear(64 * input, 128), nn.ReLU(),
+        #                          nn.Linear(128, output))
         
         self.net.apply(init_params)
 

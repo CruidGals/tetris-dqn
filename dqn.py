@@ -7,14 +7,13 @@ from torch.optim import Adam
 from model import DQNModel
 from collections import deque
 
-REPLAY_MEMORY_SIZE = 50_000
+REPLAY_MEMORY_SIZE = 100_000
 
 class DQNAgent:
     def __init__(self, input=200, output=5, action_size=5, learning_rate=1e-4, gamma=0.99, batch_size=256, 
                  target_update=10, epsilon=1.0, epsilon_min=0.1, decay_rate=0.995):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.action_size = action_size
-        self.lr = learning_rate
         self.gamma = gamma
         self.batch_size = batch_size
         self.target_update = target_update
@@ -40,7 +39,7 @@ class DQNAgent:
         self.recent_rewards = deque(maxlen=100)
 
         # NN stuff
-        self.optimizer = Adam(self.model.parameters())
+        self.optimizer = Adam(self.model.parameters(), lr=learning_rate, weight_decay=1e-3)
         self.loss = F.mse_loss
 
     def create_model(self, input, output) -> DQNModel:
@@ -52,15 +51,17 @@ class DQNAgent:
         # Don't update epsilon until recent rewards has at least 50 items in it
         if len(self.recent_rewards) < 50:
             return
+        
+        self.epsilon = max(self.epsilon_min, self.epsilon * self.decay_rate)
 
         # Do epsilon decay
-        recent_rewards_list = list(self.recent_rewards)
-        rewards = recent_rewards_list[-50:]
-        recent_mean = np.mean(rewards[-25:])
-        old_mean = np.mean(rewards[:25])
+        # recent_rewards_list = list(self.recent_rewards)
+        # rewards = recent_rewards_list[-50:]
+        # recent_mean = np.mean(rewards[-25:])
+        # old_mean = np.mean(rewards[:25])
 
-        if recent_mean > old_mean:
-            self.epsilon = max(self.epsilon_min, self.epsilon * self.decay_rate)
+        # if recent_mean > old_mean:
+        #     self.epsilon = max(self.epsilon_min, self.epsilon * self.decay_rate)
 
     def update_target_model(self):
         # Make sure to update once hit target update
