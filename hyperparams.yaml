@@ -4,9 +4,12 @@ network:
 
 agent:
   action_size: 5
-  learning_rate: 0.0001
+  learning_rate: 0.00025
+  weight_decay: 0.001
   gamma: 0.99
-  batch_size: 256
+  batch_size: 64
+  replay_buffer_size: 100000
+  min_buffer_before_training: 5000
   target_update_rate: 20
   epsilon: 1.0
   epsilon_min: 0.1
