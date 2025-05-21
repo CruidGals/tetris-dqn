@@ -23,8 +23,11 @@ def train(config):
         output=config['network']['output'],
         action_size=config['agent']['action_size'],
         learning_rate=config['agent']['learning_rate'],
+        weight_decay=config['agent']['weight_decay'],
         gamma=config['agent']['gamma'],
         batch_size=config['agent']['batch_size'],
+        replay_buffer_size=config['agent']['replay_buffer_size'],
+        min_buffer_before_training=config['agent']['min_buffer_before_training'],
         target_update=config['agent']['target_update_rate'],
         epsilon=config['agent']['epsilon'],
         epsilon_min=config['agent']['epsilon_min'],
@@ -34,12 +37,16 @@ def train(config):
     env = Tetris(use_pygame=config['training']['render'])
     best_reward = -np.inf
     best_episode = 0
+    best_episode_replay = None
 
     # Begin training
     for i in range(config['training']['episodes']):
         state = env.reset()
         total_reward = 0
         ep_loss = 0
+
+        # Keep track of the states in this episode
+        episode_replay = [state]
 
         # Run episode until max length of ~30 seconds
         start_time = time.time()
@@ -60,6 +67,9 @@ def train(config):
             reward = 0
             action = agent.act(state)
             next_state = env.move(action)
+
+            # Store state in replay
+            episode_replay.append(next_state)
 
             # Falling behavior (every 5 frames)
             if env.clock.frame_count % 4 == 0:
@@ -85,23 +95,26 @@ def train(config):
 
         if total_reward > best_reward:
             best_reward = total_reward
-            best_episode = i
+            best_episode = i + 1
+            best_episode_replay = episode_replay
 
         # Update the epsilon and critic model after every episode
         agent.update()
-        print(f"Episode: {i}; Reward: {total_reward:.3f}; Epsilon: {agent.epsilon:.2f}; Landed: {env.landed_block_count}; Loss/per: {(ep_loss / env.landed_block_count):.2f}")
+        print(f"Episode: {i+1}; Reward: {total_reward:.3f}; Epsilon: {agent.epsilon:.2f}; Landed: {env.landed_block_count}; Loss/per: {(ep_loss / env.landed_block_count):.2f}")
         
-        # Save after every 500 episodes (even the 0th)
-        if i % 500 == 0:
-            agent.save(os.path.join(result_dir, f"model_{i}.pth"))
+        # Save agent and episode replay after every 500 episodes
+        if (i+1) % 500 == 0:
+            agent.save(os.path.join(result_dir, f"model_{i+1}.pth"))
+            np.save(os.path.join(result_dir, f'episode_replay_{i + 1}.npy'))
     
     print(f"Best reward: {best_reward}; Best episode: {best_episode}")
+    np.save(os.path.join(result_dir, f'best_episode_replay_{best_episode}.npy'), best_episode_replay)
 
     # Save the overall agent
     agent.save(os.path.join(result_dir, 'model_5000.pth'))
 
     return agent, env
-        
+
 
 def eval(config, agent, env):
     pass
