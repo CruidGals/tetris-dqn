@@ -11,7 +11,7 @@ def train(config):
     Train the agent based on the hyperparameters
     """
     timestamp = time.strftime('%H%d%m%Y')
-    result_dir = os.path.join('results/models', f"experiement_{timestamp}")
+    result_dir = os.path.join('results/models', f"experiment_{timestamp}")
     os.makedirs(result_dir, exist_ok=True)
 
     # Save config file
