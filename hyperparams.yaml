@@ -21,5 +21,6 @@ training:
   render: True
 
 evaluation:
-  episodes: 10
+  episodes: 50
   max_episode_length: 60
+  render: True

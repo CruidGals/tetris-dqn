@@ -100,12 +100,12 @@ def train(config):
 
         # Update the epsilon and critic model after every episode
         agent.update()
-        print(f"Episode: {i+1}; Reward: {total_reward:.3f}; Epsilon: {agent.epsilon:.2f}; Landed: {env.landed_block_count}; Loss/per: {(ep_loss / env.landed_block_count):.2f}")
+        print(f"Episode: {i+1}; Reward: {total_reward:.3f}; Epsilon: {agent.epsilon:.2f}; Landed: {env.landed_block_count}; Loss/per: {(ep_loss / env.landed_block_count):.2f}; Rows Cleared: {env.rows_cleared}")
         
         # Save agent and episode replay after every 500 episodes
         if (i+1) % 500 == 0:
             agent.save(os.path.join(result_dir, f"model_{i+1}.pth"))
-            np.save(os.path.join(result_dir, f'episode_replay_{i + 1}.npy'))
+            np.save(os.path.join(result_dir, f'episode_replay_{i + 1}.npy'), episode_replay)
     
     print(f"Best reward: {best_reward}; Best episode: {best_episode}")
     np.save(os.path.join(result_dir, f'best_episode_replay_{best_episode}.npy'), best_episode_replay)

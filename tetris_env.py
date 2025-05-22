@@ -137,6 +137,7 @@ class Tetris:
         # Keep track of state of game
         self.done = False
         self.landed_block_count = 0
+        self.rows_cleared = 0
 
     def start(self):
         """
@@ -258,6 +259,7 @@ class Tetris:
                 self.grid.pop(i)
                 self.grid.insert(0, ['.' for i in range(10)])
                 count += 1
+                self.rows_cleared += 1
 
     # Environment specific functions
     def reset(self):
@@ -269,6 +271,7 @@ class Tetris:
         self.frame_count = 0
         self.block_queue = []
         self.landed_block_count = 0
+        self.rows_cleared = 0
 
         self.start()
         return self._get_observation()
@@ -303,7 +306,7 @@ class Tetris:
             # A full row is cleared
             if row.count('#') == 10:
                 # Decrease or increase based on performance
-                reward += 5
+                reward += 10
 
         # Penalize height
         highest_row = -1
