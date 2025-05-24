@@ -73,13 +73,15 @@ def train(config):
 
             # Falling behavior (every 5 frames)
             if env.clock.frame_count % 4 == 0:
-                reward += env.fall()
+                env.fall()
+
+            reward += env.distribute_reward()
+            env.clear_rows()
 
             if config['training']['render']:
                 env.render()
 
             done = env.done
-            reward += 0.1
             total_reward += reward
             agent.remember((state, action, reward, next_state, done))
 

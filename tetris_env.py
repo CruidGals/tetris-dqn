@@ -222,11 +222,7 @@ class Tetris:
                 self.grid[x][y] = '#'
             
             self.cycle_block()
-            reward = self.distribute_reward()
-            self.clear_rows()
             self.landed_block_count += 1
-
-        return reward
 
     def valid_pos(self, positions):
         """
@@ -315,7 +311,7 @@ class Tetris:
                 highest_row = i
                 break 
 
-        reward -= (21 - highest_row) ** 1.5 * 0.01
+        reward -= (21 - highest_row) ** 1.5 * 0.001
 
         # Find holes and penalize them
         holes = 0
@@ -328,7 +324,7 @@ class Tetris:
                 elif self.grid[row][col] == '.' and block_found:
                     holes += 1
         
-        reward -= holes * 0.05
+        reward -= holes * 0.001
         
 
         # Penalize dying early

@@ -11,9 +11,9 @@ agent:
   replay_buffer_size: 100000
   min_buffer_before_training: 5000
   target_update_rate: 20
-  epsilon: 1.0
-  epsilon_min: 0.1
-  decay_rate: 0.999
+  epsilon: 0.3
+  epsilon_min: 0.001
+  decay_rate: 0.995
 
 training:
   episodes: 5000
