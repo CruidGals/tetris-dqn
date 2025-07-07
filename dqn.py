@@ -4,12 +4,13 @@ import torch.nn.functional as F
 import numpy as np
 import random
 from torch.optim import Adam
+from torch.optim.lr_scheduler import StepLR
 from model import DQNModel
 from collections import deque
 
 class DQNAgent:
     def __init__(self, input=200, output=5, action_size=5, learning_rate=1e-4, weight_decay=1e-3, gamma=0.99, batch_size=256, replay_buffer_size=100000,
-                 min_buffer_before_training=5000, target_update=10, epsilon=1.0, epsilon_min=0.1, decay_rate=0.995):
+                 min_buffer_before_training=5000, target_update=10, epsilon=1.0, epsilon_min=0.1, lr_gamma=0.5, lr_step_size=400, lr_end=0.00001, decay_rate=0.995):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.action_size = action_size
         self.gamma = gamma
@@ -34,33 +35,18 @@ class DQNAgent:
         self.replay_memory = deque(maxlen=replay_buffer_size)
         self.min_buffer_before_training = min_buffer_before_training
 
-        # Used for performance-based epsilon decay
-        self.recent_rewards = deque(maxlen=100)
-
         # NN stuff
         self.optimizer = Adam(self.model.parameters(), lr=learning_rate, weight_decay=weight_decay)
         self.loss = F.mse_loss
+        self.lr_scheduler = StepLR(self.optimizer, lr_step_size, lr_gamma)
+        self.lr_end = lr_end
 
     def create_model(self, input, output) -> DQNModel:
         return DQNModel(input, output)
     
     def update(self):
         self.update_target_model()
-
-        # Don't update epsilon until recent rewards has at least 50 items in it
-        if len(self.recent_rewards) < 50:
-            return
-        
         self.epsilon = max(self.epsilon_min, self.epsilon * self.decay_rate)
-
-        # Do epsilon decay
-        # recent_rewards_list = list(self.recent_rewards)
-        # rewards = recent_rewards_list[-50:]
-        # recent_mean = np.mean(rewards[-25:])
-        # old_mean = np.mean(rewards[:25])
-
-        # if recent_mean > old_mean:
-        #     self.epsilon = max(self.epsilon_min, self.epsilon * self.decay_rate)
 
     def update_target_model(self):
         # Make sure to update once hit target update
@@ -82,7 +68,6 @@ class DQNAgent:
         Transition consists of (state, action, reward, next_state, done)
         """
         self.replay_memory.append(transition)
-        self.recent_rewards.append(transition[2])
 
     def act(self, state):
         """
@@ -124,6 +109,10 @@ class DQNAgent:
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+
+        # Update learning rate
+        if self.lr_scheduler.get_lr()[0] > self.lr_end:
+            self.lr_scheduler.step()
 
         return loss
     

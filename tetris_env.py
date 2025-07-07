@@ -19,6 +19,7 @@ class Clock:
 
         if self.frame_count == self.frame_rate:
             self.frame_count = 0
+
 class Block:
     # Make each block an enum
     O = 0 # 2x2 block
@@ -208,11 +209,10 @@ class Tetris:
 
     def fall(self):
         """
-        Simulate the block falling by one block
+        Simulate the block falling by one block. Return True if block has landed
         """
         orig_pos = self.controlled_block.pos
         self.controlled_block.pos = (self.controlled_block.pos[0], self.controlled_block.pos[1] + 1)
-        reward = 0
 
         if not self.valid_pos(self.controlled_block.get_pixel_pos()):
             self.controlled_block.pos = orig_pos
@@ -223,6 +223,9 @@ class Tetris:
             
             self.cycle_block()
             self.landed_block_count += 1
+            return True
+        
+        return False
 
     def valid_pos(self, positions):
         """
@@ -302,7 +305,7 @@ class Tetris:
             # A full row is cleared
             if row.count('#') == 10:
                 # Decrease or increase based on performance
-                reward += 10
+                reward += 20
 
         # Penalize height
         highest_row = -1
@@ -311,7 +314,7 @@ class Tetris:
                 highest_row = i
                 break 
 
-        reward -= (21 - highest_row) ** 1.5 * 0.001
+        reward -= (21 - highest_row) ** 1.5 * 0.0005
 
         # Find holes and penalize them
         holes = 0
@@ -324,12 +327,22 @@ class Tetris:
                 elif self.grid[row][col] == '.' and block_found:
                     holes += 1
         
-        reward -= holes * 0.001
-        
+        reward -= holes * 0.0001
 
-        # Penalize dying early
-        if self.done:
-            reward -= np.exp(-(self.landed_block_count-10) / 10) * 5
+        # Calculate bumpiness
+        column_heights = []
+
+        for col in range(10):
+            col_height = 0
+            for row in range(22):
+                if self.grid[row][col] == '#':
+                    col_height = 21 - row
+                    break
+
+            column_heights.append(col_height)
+
+        bumpiness = sum(abs(column_heights[i] - column_heights[i + 1]) for i in range(9))
+        reward -= bumpiness * 0.001
 
         return reward 
 

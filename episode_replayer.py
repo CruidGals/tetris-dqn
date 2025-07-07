@@ -44,9 +44,9 @@ def replay(arr):
     py.quit()
 
 if __name__ == '__main__':
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('-i', '--input', type=str, required=True, help="Path to the episode replay")
-    # args = parser.parse_args()
-    arr = np.load('results/models/experiement_1821052025/episode_replay_1000.npy')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input', type=str, required=True, help="Path to the episode replay")
+    args = parser.parse_args()
+    arr = np.load(args.input)
     
     replay(arr)

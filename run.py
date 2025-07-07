@@ -31,6 +31,9 @@ def train(config):
         target_update=config['agent']['target_update_rate'],
         epsilon=config['agent']['epsilon'],
         epsilon_min=config['agent']['epsilon_min'],
+        lr_gamma=config['agent']['lr_scheduler']['gamma'],
+        lr_step_size=config['agent']['lr_scheduler']['step_size'],
+        lr_end=config['agent']['lr_scheduler']['lr_end'],
         decay_rate=config['agent']['decay_rate']
     )
 
@@ -48,23 +51,21 @@ def train(config):
         # Keep track of the states in this episode
         episode_replay = [state]
 
+        # Accumulate rewards until landed
+        reward = 0
+
         # Run episode until max length of ~30 seconds
         start_time = time.time()
         prev_time = start_time
         max_time = config['training']['max_episode_length']
 
         while prev_time - start_time < max_time:
-            curr_time = time.time()
-
-            # Make a move every millisecond
-            if curr_time - prev_time < 1/1000:
-                continue
+            time.sleep(0.001)
             
             # Update current_time
-            prev_time = curr_time
+            prev_time = time.time()
 
             # Start the training process
-            reward = 0
             action = agent.act(state)
             next_state = env.move(action)
 
@@ -73,17 +74,19 @@ def train(config):
 
             # Falling behavior (every 5 frames)
             if env.clock.frame_count % 4 == 0:
-                env.fall()
+                block_landed = env.fall()
 
             reward += env.distribute_reward()
             env.clear_rows()
+            done = env.done
+            
+            if block_landed:
+                agent.remember((state, action, reward, next_state, done))
+                total_reward += reward
+                reward = 0
 
             if config['training']['render']:
                 env.render()
-
-            done = env.done
-            total_reward += reward
-            agent.remember((state, action, reward, next_state, done))
 
             if done:
                 break
@@ -102,7 +105,8 @@ def train(config):
 
         # Update the epsilon and critic model after every episode
         agent.update()
-        print(f"Episode: {i+1}; Reward: {total_reward:.3f}; Epsilon: {agent.epsilon:.2f}; Landed: {env.landed_block_count}; Loss/per: {(ep_loss / env.landed_block_count):.2f}; Rows Cleared: {env.rows_cleared}")
+
+        print(f"Episode: {i+1}; Reward: {total_reward:.3f}; Epsilon: {agent.epsilon:.2f}; Landed: {env.landed_block_count}; Loss/per: {(ep_loss / env.landed_block_count):.2f}; Cleared: {env.rows_cleared}; Buffer: {len(agent.replay_memory)}")
         
         # Save agent and episode replay after every 500 episodes
         if (i+1) % 500 == 0:
@@ -113,7 +117,7 @@ def train(config):
     np.save(os.path.join(result_dir, f'best_episode_replay_{best_episode}.npy'), best_episode_replay)
 
     # Save the overall agent
-    agent.save(os.path.join(result_dir, 'model_5000.pth'))
+    agent.save(os.path.join(result_dir, f"model_{config['training']['episodes']}.pth"))
 
     return agent, env
 
