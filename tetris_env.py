@@ -4,22 +4,6 @@ import time
 import sys
 from collections import deque
 
-class Clock:
-    def __init__(self, frame_rate):
-        self.frame_rate = frame_rate
-        self.prev_time = time.time()
-        self.frame_count = 0
-
-    def tick(self):
-        current_time = time.time()
-        
-        if current_time - self.prev_time >= (1/self.frame_rate):
-            self.frame_count += 1
-            self.prev_time = current_time
-
-        if self.frame_count == self.frame_rate:
-            self.frame_count = 0
-
 class Block:
     # Make each block an enum
     O = 0 # 2x2 block
@@ -124,9 +108,6 @@ class Tetris:
         self.grid = [['.' for i in range(10)] for i in range(22)] # 10 * 20, with 2 unrendered rows at the top
         self.cell_size = 30
         self.screen_size = (10 * self.cell_size, 20 * self.cell_size)
-
-        # Set up a clock to control falling
-        self.clock = Clock(frame_rate=frame_rate)
 
         if self.use_pygame:
             py.init()
@@ -298,14 +279,14 @@ class Tetris:
         Distribute the reward after a block lands (counts as one step in this environment).
         Features rewards such as: survival (low), clearing rows (big), encouraging flatter structure (moderate), penalizing holes, encouraging lower height
         """
-        reward = 0
+        reward = 0.001 # Survival award
 
         # Clear rows reward
         for row in self.grid:
             # A full row is cleared
             if row.count('#') == 10:
                 # Decrease or increase based on performance
-                reward += 20
+                reward += 10
 
         # Penalize height
         highest_row = -1
@@ -314,7 +295,7 @@ class Tetris:
                 highest_row = i
                 break 
 
-        reward -= (21 - highest_row) ** 1.5 * 0.0005
+        reward -= (highest_row / 22) * 0.001
 
         # Find holes and penalize them
         holes = 0
@@ -327,7 +308,7 @@ class Tetris:
                 elif self.grid[row][col] == '.' and block_found:
                     holes += 1
         
-        reward -= holes * 0.0001
+        reward -= holes * 0.005
 
         # Calculate bumpiness
         column_heights = []
@@ -342,7 +323,7 @@ class Tetris:
             column_heights.append(col_height)
 
         bumpiness = sum(abs(column_heights[i] - column_heights[i + 1]) for i in range(9))
-        reward -= bumpiness * 0.001
+        reward -= bumpiness * 0.005
 
         return reward 
 

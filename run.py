@@ -47,6 +47,7 @@ def train(config):
         state = env.reset()
         total_reward = 0
         ep_loss = 0
+        frame_count = 0
 
         # Keep track of the states in this episode
         episode_replay = [state]
@@ -60,7 +61,7 @@ def train(config):
         max_time = config['training']['max_episode_length']
 
         while prev_time - start_time < max_time:
-            time.sleep(0.001)
+            time.sleep(1./240.)
             
             # Update current_time
             prev_time = time.time()
@@ -73,7 +74,7 @@ def train(config):
             episode_replay.append(next_state)
 
             # Falling behavior (every 5 frames)
-            if env.clock.frame_count % 4 == 0:
+            if frame_count % 2 == 0:
                 block_landed = env.fall()
 
             reward += env.distribute_reward()
@@ -92,11 +93,12 @@ def train(config):
                 break
 
             # Train less frequently
-            if env.clock.frame_count % 4 == 0:
+            if frame_count % 4 == 0:
                 loss = agent.train()
                 ep_loss += loss if loss else 0
             
             state = next_state
+            frame_count += 1
 
         if total_reward > best_reward:
             best_reward = total_reward

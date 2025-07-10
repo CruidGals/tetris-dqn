@@ -5,6 +5,7 @@ import numpy as np
 import random
 from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
+from torch.utils.tensorboard import SummaryWriter
 from model import DQNModel
 from collections import deque
 
@@ -40,6 +41,10 @@ class DQNAgent:
         self.loss = F.mse_loss
         self.lr_scheduler = StepLR(self.optimizer, lr_step_size, lr_gamma)
         self.lr_end = lr_end
+
+        # Tensorboard
+        self.writer = SummaryWriter()
+        self.training_step = 0
 
     def create_model(self, input, output) -> DQNModel:
         return DQNModel(input, output)
@@ -106,13 +111,26 @@ class DQNAgent:
             target_q_vals = rewards.unsqueeze(1) + (1 - dones.unsqueeze(1)) * self.gamma * next_q_vals
         
         loss = self.loss(curr_q_vals, target_q_vals)
+
+        # Write the loss to writer
+        self.writer.add_scalar('Loss/train', loss, self.training_step)
+
         self.optimizer.zero_grad()
         loss.backward()
+
+        # Write gradient to writer
+        for name, param in self.model.named_parameters():
+            if param.grad is not None:
+                self.writer.add_scalar(f'GradNorm/{name}', param.grad.norm(), self.training_step)
+
         self.optimizer.step()
 
         # Update learning rate
         if self.lr_scheduler.get_lr()[0] > self.lr_end:
             self.lr_scheduler.step()
+
+        # Increment x-axis for logs
+        self.training_step += 1
 
         return loss
     
