@@ -20,9 +20,9 @@ Training will also rely on use of the **Bellman's Equation**, which tells us the
 
 This is a tentative list of what I want to achieve with this project.
 
-- Complete the Tetris Environment (make sure it is fully functional)
-- Setup the reinforcement learning environment; assign rewards and penalties and a way for the network to interact with the game
-- Train and adjust hyperparameters
+- Train and adjust hyperparameters; use TensorBoard to more effectively diagnose the pitfalls of my network
+- Look into Optuna for further hyperparameter tuning.
+- Implement the ability to run multiple instances of Tetris at once -- may be useful in training & hyperparameter tuning
 
 ## How to run
 
