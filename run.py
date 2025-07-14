@@ -80,6 +80,10 @@ def train(config):
             reward += env.distribute_reward()
             env.clear_rows()
             done = env.done
+
+            if done:
+                early_penalty = max(0, 40.0 - 2 * env.landed_block_count)
+                reward -= early_penalty
             
             if block_landed:
                 agent.remember((state, action, reward, next_state, done))

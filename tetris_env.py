@@ -295,7 +295,7 @@ class Tetris:
                 highest_row = i
                 break 
 
-        reward -= (highest_row / 22) * 0.001
+        reward -= (highest_row / 22) * 0.005
 
         # Find holes and penalize them
         holes = 0
@@ -308,7 +308,7 @@ class Tetris:
                 elif self.grid[row][col] == '.' and block_found:
                     holes += 1
         
-        reward -= holes * 0.005
+        reward -= holes * 0.002
 
         # Calculate bumpiness
         column_heights = []
@@ -323,7 +323,7 @@ class Tetris:
             column_heights.append(col_height)
 
         bumpiness = sum(abs(column_heights[i] - column_heights[i + 1]) for i in range(9))
-        reward -= bumpiness * 0.005
+        reward -= bumpiness * 0.001
 
         return reward 
 
