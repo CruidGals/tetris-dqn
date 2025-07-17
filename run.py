@@ -10,7 +10,7 @@ def train(config):
     """
     Train the agent based on the hyperparameters
     """
-    timestamp = time.strftime('%H%d%m%Y')
+    timestamp = time.strftime('%Y%m%d%H')
     result_dir = os.path.join('results/models', f"experiment_{timestamp}")
     os.makedirs(result_dir, exist_ok=True)
 
@@ -61,7 +61,7 @@ def train(config):
         max_time = config['training']['max_episode_length']
 
         while prev_time - start_time < max_time:
-            time.sleep(1./240.)
+            time.sleep(1./480.)
             
             # Update current_time
             prev_time = time.time()
@@ -82,7 +82,7 @@ def train(config):
             done = env.done
 
             if done:
-                early_penalty = max(0, 40.0 - 2 * env.landed_block_count)
+                early_penalty = max(0, 5.0 - 0.25 * env.landed_block_count)
                 reward -= early_penalty
             
             if block_landed:
@@ -112,7 +112,7 @@ def train(config):
         # Update the epsilon and critic model after every episode
         agent.update()
 
-        print(f"Episode: {i+1}; Reward: {total_reward:.3f}; Epsilon: {agent.epsilon:.2f}; Landed: {env.landed_block_count}; Loss/per: {(ep_loss / env.landed_block_count):.2f}; Cleared: {env.rows_cleared}; Buffer: {len(agent.replay_memory)}")
+        print(f"Episode: {i+1}; Avg Reward: {(total_reward / env.landed_block_count):.3f}; Epsilon: {agent.epsilon:.2f}; Landed: {env.landed_block_count}; Loss/per: {(ep_loss / env.landed_block_count):.2f}; Cleared: {env.rows_cleared}")
         
         # Save agent and episode replay after every 500 episodes
         if (i+1) % 500 == 0:

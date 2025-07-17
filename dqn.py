@@ -124,7 +124,7 @@ class DQNAgent:
                 self.writer.add_scalar(f'GradNorm/{name}', param.grad.norm(), self.training_step)
 
         # Clip gradients and write it too
-        total_norm = nn.utils.clip_grad_norm_(self.model.net.parameters(), max_norm=100.00)
+        total_norm = nn.utils.clip_grad_norm_(self.model.net.parameters(), max_norm=1000.00)
         self.writer.add_scalar(f'GradNorm/clipped', total_norm, self.training_step)
 
         self.optimizer.step()

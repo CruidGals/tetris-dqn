@@ -10,17 +10,17 @@ agent:
   batch_size: 64
   replay_buffer_size: 10000
   min_buffer_before_training: 500
-  target_update_rate: 10
+  target_update_rate: 15
   epsilon: 1
   epsilon_min: 0.001
-  decay_rate: 0.999
+  decay_rate: 0.998
   lr_scheduler:
     gamma: 0.5
-    step_size: 200
+    step_size: 350
     lr_end: 0.00001
 
 training:
-  episodes: 3000
+  episodes: 5000
   max_episode_length: 30 # Max episode length in seconds
   render: False
 
