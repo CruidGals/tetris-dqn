@@ -279,7 +279,7 @@ class Tetris:
         Distribute the reward after a block lands (counts as one step in this environment).
         Features rewards such as: survival (low), clearing rows (big), encouraging flatter structure (moderate), penalizing holes, encouraging lower height
         """
-        reward = 0
+        reward = 0.1
 
         # Clear rows reward
         for row in self.grid:
@@ -295,7 +295,7 @@ class Tetris:
                 highest_row = i
                 break 
 
-        reward -= (highest_row / 22) * 0.005
+        reward -= (highest_row / 22) * 0.2
 
         # Find holes and penalize them
         holes = 0
@@ -308,7 +308,7 @@ class Tetris:
                 elif self.grid[row][col] == '.' and block_found:
                     holes += 1
         
-        reward -= holes * 0.003
+        reward -= holes * 0.01
 
         # Calculate bumpiness
         column_heights = []
@@ -323,7 +323,7 @@ class Tetris:
             column_heights.append(col_height)
 
         bumpiness = sum(abs(column_heights[i] - column_heights[i + 1]) for i in range(9))
-        reward -= bumpiness * 0.001
+        reward -= bumpiness * 0.01
 
         return reward 
 

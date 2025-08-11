@@ -77,15 +77,15 @@ def train(config):
             if frame_count % 2 == 0:
                 block_landed = env.fall()
 
-            reward += env.distribute_reward()
             env.clear_rows()
             done = env.done
 
             if done:
-                early_penalty = max(0, 5.0 - 0.25 * env.landed_block_count)
+                early_penalty = max(0, 20.0 - 1 * env.landed_block_count)
                 reward -= early_penalty
             
             if block_landed:
+                reward += env.distribute_reward()
                 agent.remember((state, action, reward, next_state, done))
                 total_reward += reward
                 reward = 0
@@ -112,7 +112,7 @@ def train(config):
         # Update the epsilon and critic model after every episode
         agent.update()
 
-        print(f"Episode: {i+1}; Avg Reward: {(total_reward / env.landed_block_count):.3f}; Epsilon: {agent.epsilon:.2f}; Landed: {env.landed_block_count}; Loss/per: {(ep_loss / env.landed_block_count):.2f}; Cleared: {env.rows_cleared}")
+        print(f"Episode: {i+1}; Avg Reward: {(total_reward / env.landed_block_count):.3f}; Epsilon: {agent.epsilon:.3f}; Landed: {env.landed_block_count}; Loss/per: {(ep_loss / env.landed_block_count):.2f}; Cleared: {env.rows_cleared}")
         
         # Save agent and episode replay after every 500 episodes
         if (i+1) % 500 == 0:

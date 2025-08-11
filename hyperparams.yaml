@@ -20,7 +20,7 @@ agent:
     lr_end: 0.00001
 
 training:
-  episodes: 5000
+  episodes: 2000
   max_episode_length: 30 # Max episode length in seconds
   render: False
 
