@@ -126,8 +126,8 @@ class DQNAgent:
         self.optimizer.step()
 
         # Update learning rate
-        if self.lr_scheduler.get_lr()[0] > self.lr_end:
-            self.lr_scheduler.step()
+        # if self.lr_scheduler.get_lr()[0] > self.lr_end:
+        #     self.lr_scheduler.step()
 
         # Increment x-axis for logs
         self.training_step += 1

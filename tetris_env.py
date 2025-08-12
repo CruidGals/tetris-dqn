@@ -4,6 +4,8 @@ import time
 import sys
 from collections import deque
 
+from mdp.utils import one_hot, grid_features
+
 class Block:
     # Make each block an enum
     O = 0 # 2x2 block
@@ -241,6 +243,8 @@ class Tetris:
                 count += 1
                 self.rows_cleared += 1
 
+        self.lines_cleared_landed = count
+
     # Environment specific functions
     def reset(self):
         """
@@ -252,6 +256,7 @@ class Tetris:
         self.block_queue = []
         self.landed_block_count = 0
         self.rows_cleared = 0
+        self.lines_cleared_landed = 0
 
         self.start()
         return self._get_observation()
@@ -259,6 +264,8 @@ class Tetris:
     def _get_observation(self):
         """
         Returns the visual part of the grid, denoting '.' as 0, '#' as .5, and '$' as 1
+
+        Also contains various other observations like falling block type, rotation, position
         """
 
         transformed_grid = np.array(self.grid).copy()
@@ -267,63 +274,55 @@ class Tetris:
         mapping = {'.': 0, '#': 1}
         transformed_grid = np.vectorize(lambda x: mapping[x])(transformed_grid).astype('float64')
 
+        # Get grid features
+        features = grid_features(transformed_grid)
+    
         # Fill in falling block as 0.5
         for y, x in self.controlled_block.get_pixel_pos():
             transformed_grid[x][y] = 0.5
 
-        # Constrin to visual part of grid
-        return transformed_grid[2:, :].flatten()
+        # Embed falling block type, rotation, and anchor position
+        block_type = one_hot(7, self.controlled_block.type)
+        block_rot = one_hot(4, self.controlled_block.flipped_status)
+        block_anchor = np.array(self.controlled_block.pos)
+
+        # Other MDP essentials
+        next_blocks = np.concatenate([
+            one_hot(7, block.type) for block in self.block_queue
+        ])
+        lines_cleared = np.array([np.sum(np.all(transformed_grid >= 0.5, axis=1))])
+
+        # Computed observations
+        col_heights = features["col_heights"]
+        col_holes = features["col_holes"]
+        bumpiness = features["bump"]
+        row_transitions = features["row_transitions"]
+        col_transitions = features["col_transitions"]
+
+        # Concatenate entire observation
+        return np.concatenate([                             # 58 total dimension
+            block_type.astype(np.float32),                  # 7 dim
+            block_rot.astype(np.float32),                   # 4 dim
+            block_anchor.astype(np.float32),                # 2 dim
+            next_blocks.astype(np.float32),                 # 21 dim
+            np.array(col_heights, dtype=np.float32),        # 10 dim
+            np.array(col_holes, dtype=np.float32),          # 10 dim
+            np.array([bumpiness], dtype=np.float32),        # 1 dim
+            np.array([row_transitions], dtype=np.float32),  # 1 dim
+            np.array([col_transitions], dtype=np.float32),  # 1 dim
+            lines_cleared.astype(np.float32),               # 1 dim
+        ])
     
     def distribute_reward(self):
         """
-        Distribute the reward after a block lands (counts as one step in this environment).
-        Features rewards such as: survival (low), clearing rows (big), encouraging flatter structure (moderate), penalizing holes, encouraging lower height
+        Distribute the reward after a block lands (counts as one step in this environment),
         """
-        reward = 0.1
+        reward = 1.0
 
-        # Clear rows reward
-        for row in self.grid:
-            # A full row is cleared
-            if row.count('#') == 10:
-                # Decrease or increase based on performance
-                reward += 5
+        # Lines cleared reward
+        reward += 35 * self.lines_cleared_landed ** 2
 
-        # Penalize height
-        highest_row = -1
-        for i, row in enumerate(self.grid):
-            if '#' in row and highest_row == -1:
-                highest_row = i
-                break 
-
-        reward -= (highest_row / 22) * 0.2
-
-        # Find holes and penalize them
-        holes = 0
-
-        for col in range(10):
-            block_found = False
-            for row in range(22):
-                if self.grid[row][col] == '#':
-                    block_found = True
-                elif self.grid[row][col] == '.' and block_found:
-                    holes += 1
-        
-        reward -= holes * 0.01
-
-        # Calculate bumpiness
-        column_heights = []
-
-        for col in range(10):
-            col_height = 0
-            for row in range(22):
-                if self.grid[row][col] == '#':
-                    col_height = 21 - row
-                    break
-
-            column_heights.append(col_height)
-
-        bumpiness = sum(abs(column_heights[i] - column_heights[i + 1]) for i in range(9))
-        reward -= bumpiness * 0.01
+        self.lines_cleared_landed = 0
 
         return reward 
 
