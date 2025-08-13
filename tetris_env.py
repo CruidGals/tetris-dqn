@@ -3,8 +3,10 @@ import pygame as py
 import time
 import sys
 from collections import deque
+from copy import deepcopy
 
-from mdp.utils import one_hot, grid_features
+import mdp.utils as utils
+import mdp.observations as obs_terms
 
 class Block:
     # Make each block an enum
@@ -23,7 +25,7 @@ class Block:
         self.type = block_type
 
         # 0 deg: 0 | 90 deg: 1 | 180 deg: 2 | 270 deg: 3 (GOING CCW)
-        self.flipped_status = 0
+        self.rotation = 0
 
         # Tetris is a 22*10 grid (first two rows aren't shown), specify spawn position as the bottom-left corner. Read coordinate left to right, top to bottom
         self._spawn_pos = (4,3) if self.type == Block.O else (3,3)
@@ -33,9 +35,9 @@ class Block:
     def flip(self, is_ccw_flip=False):
         # Handle if user flipped piece in the counter clockwise (CCW) direction
         if is_ccw_flip:
-            self.flipped_status = self.flipped_status + 1 if self.flipped_status < 3 else 0
+            self.rotation = self.rotation + 1 if self.rotation < 3 else 0
         else:
-            self.flipped_status = self.flipped_status - 1 if self.flipped_status > 0 else 3
+            self.rotation = self.rotation - 1 if self.rotation > 0 else 3
 
     def get_pixel_pos(self):
         """
@@ -47,55 +49,57 @@ class Block:
                 return [(self.pos[0], self.pos[1]), (self.pos[0] + 1, self.pos[1]), (self.pos[0], self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 1)]
             case Block.I:
                 # Only two flip patterns
-                if self.flipped_status % 2 == 0: # 0 or 180 deg
+                if self.rotation % 2 == 0: # 0 or 180 deg
                     return [(self.pos[0], self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1), (self.pos[0] + 3, self.pos[1] - 1)]
                 
                 return [(self.pos[0] + 2, self.pos[1]), (self.pos[0] + 2, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 2), (self.pos[0] + 2, self.pos[1] - 3)]
             case Block.S:
                 # 2 flip patterns
-                if self.flipped_status % 2 == 0: # 0 or 180 deg
+                if self.rotation % 2 == 0: # 0 or 180 deg
                     return [(self.pos[0], self.pos[1]), (self.pos[0] + 1, self.pos[1]), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1)]
                 
                 return [(self.pos[0] + 1, self.pos[1] - 2), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1])]
             case Block.Z:
                 # 2 flip patterns
-                if self.flipped_status % 2 == 0: # 0 or 180 deg
+                if self.rotation % 2 == 0: # 0 or 180 deg
                     return [(self.pos[0], self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1]), (self.pos[0] + 2, self.pos[1])]
                 
                 return [(self.pos[0] + 1, self.pos[1]), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 2)]
             case Block.L:
                 # 4 flip patterns
-                if self.flipped_status == 0: # 0 deg
+                if self.rotation == 0: # 0 deg
                     return [(self.pos[0], self.pos[1]), (self.pos[0], self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1)]
-                elif self.flipped_status == 1: # 90 deg
+                elif self.rotation == 1: # 90 deg
                     return [(self.pos[0] + 1, self.pos[1] - 2), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1]), (self.pos[0] + 2, self.pos[1])]
-                elif self.flipped_status == 2: # 180 deg
+                elif self.rotation == 2: # 180 deg
                     return [(self.pos[0], self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 2)]
                 else: # 270 deg
                     return [(self.pos[0], self.pos[1] - 2), (self.pos[0] + 1, self.pos[1] - 2), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1])]
             case Block.J:
                 # 4 flip patterns
-                if self.flipped_status == 0: # 0 deg
+                if self.rotation == 0: # 0 deg
                     return [(self.pos[0], self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1])]
-                elif self.flipped_status == 1: # 90 deg
+                elif self.rotation == 1: # 90 deg
                     return [(self.pos[0] + 1, self.pos[1]), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 2), (self.pos[0] + 2, self.pos[1] - 2)]
-                elif self.flipped_status == 2: # 180 deg
+                elif self.rotation == 2: # 180 deg
                     return [(self.pos[0], self.pos[1] - 2), (self.pos[0], self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1)]
                 else: # 270 deg
                     return [(self.pos[0], self.pos[1]), (self.pos[0] + 1, self.pos[1]), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 2)]
             case Block.T:
                 # 4 flip patterns
-                if self.flipped_status == 0: # 0 deg
+                if self.rotation == 0: # 0 deg
                     return [(self.pos[0], self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1])]
-                elif self.flipped_status == 1: # 90 deg
+                elif self.rotation == 1: # 90 deg
                     return [(self.pos[0] + 1, self.pos[1] - 2), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1]), (self.pos[0] + 2, self.pos[1] - 1)]
-                elif self.flipped_status == 2: # 180 deg
+                elif self.rotation == 2: # 180 deg
                     return [(self.pos[0], self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 2)]
                 else: # 270 deg
                     return [(self.pos[0] + 1, self.pos[1] - 2), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1]), (self.pos[0], self.pos[1] - 1)]
 
 
 class Tetris:
+
+    CLEAR_GRID = np.array([['.' for i in range(10)] for i in range(22)])
 
     MOVE_NONE = 0
     MOVE_LEFT = 1
@@ -107,7 +111,7 @@ class Tetris:
         self.use_pygame = use_pygame 
 
         # Screen size is a grid, Denote . as nothing, and # as a filled
-        self.grid = [['.' for i in range(10)] for i in range(22)] # 10 * 20, with 2 unrendered rows at the top
+        self.grid = Tetris.CLEAR_GRID.copy() # 10 * 20, with 2 unrendered rows at the top
         self.cell_size = 30
         self.screen_size = (10 * self.cell_size, 20 * self.cell_size)
 
@@ -187,8 +191,6 @@ class Tetris:
                 pass #Do nothing
             case _:
                 raise Exception(f"Invalid move type (from 0-3). Given type: {type}")
-        
-        return self._get_observation()
 
     def fall(self):
         """
@@ -231,125 +233,23 @@ class Tetris:
     
     def clear_rows(self):
         """
-        Clears any rows that are fully filled
-        If cleared 4 rows at once, give bonus points
+        Clears any rows that are fully filled, counting them along the way
         """
-        count = 0
+        
+        # Remove any full rows
+        # Statement literally gets all indices with full rows, and indexes the grid without those indices
+        cleared_grid = self.grid[~np.all(self.grid == '#', axis=1)]
 
-        for i in range(len(self.grid)):
-            if self.grid[i].count('#') == 10:
-                self.grid.pop(i)
-                self.grid.insert(0, ['.' for i in range(10)])
-                count += 1
-                self.rows_cleared += 1
+        # Count lines cleared
+        lines_cleared = self.grid.shape[0] - cleared_grid.shape[0]
 
-        self.lines_cleared_landed = count
+        # Add empty rows at top
+        if lines_cleared > 0:
+            new_rows = np.full((lines_cleared, cleared_grid.shape[1]), fill_value='.', dtype=cleared_grid.dtype)
+            cleared_grid = np.vstack((new_rows, cleared_grid))
 
-    # Environment specific functions
-    def reset(self):
-        """
-        Resets the environment for the next episode
-        """
-        self.grid = [['.' for i in range(10)] for i in range(22)]
-        self.done = False
-        self.frame_count = 0
-        self.block_queue = []
-        self.landed_block_count = 0
-        self.rows_cleared = 0
-        self.lines_cleared_landed = 0
-
-        self.start()
-        return self._get_observation()
-
-    def _get_observation(self):
-        """
-        Returns the visual part of the grid, denoting '.' as 0, '#' as .5, and '$' as 1
-
-        Also contains various other observations like falling block type, rotation, position
-        """
-
-        transformed_grid = np.array(self.grid).copy()
-
-        # Turn empty spaces '.' into 0, and filled spaces '#' into 1
-        mapping = {'.': 0, '#': 1}
-        transformed_grid = np.vectorize(lambda x: mapping[x])(transformed_grid).astype('float64')
-
-        # Get grid features
-        features = grid_features(transformed_grid)
-    
-        # Fill in falling block as 0.5
-        for y, x in self.controlled_block.get_pixel_pos():
-            transformed_grid[x][y] = 0.5
-
-        # Embed falling block type, rotation, and anchor position
-        block_type = one_hot(7, self.controlled_block.type)
-        block_rot = one_hot(4, self.controlled_block.flipped_status)
-        block_anchor = np.array(self.controlled_block.pos)
-
-        # Other MDP essentials
-        next_blocks = np.concatenate([
-            one_hot(7, block.type) for block in self.block_queue
-        ])
-        lines_cleared = np.array([np.sum(np.all(transformed_grid >= 0.5, axis=1))])
-
-        # Computed observations
-        col_heights = features["col_heights"]
-        col_holes = features["col_holes"]
-        bumpiness = features["bump"]
-        row_transitions = features["row_transitions"]
-        col_transitions = features["col_transitions"]
-
-        # Concatenate entire observation
-        return np.concatenate([                             # 58 total dimension
-            block_type.astype(np.float32),                  # 7 dim
-            block_rot.astype(np.float32),                   # 4 dim
-            block_anchor.astype(np.float32),                # 2 dim
-            next_blocks.astype(np.float32),                 # 21 dim
-            np.array(col_heights, dtype=np.float32),        # 10 dim
-            np.array(col_holes, dtype=np.float32),          # 10 dim
-            np.array([bumpiness], dtype=np.float32),        # 1 dim
-            np.array([row_transitions], dtype=np.float32),  # 1 dim
-            np.array([col_transitions], dtype=np.float32),  # 1 dim
-            lines_cleared.astype(np.float32),               # 1 dim
-        ])
-    
-    def distribute_reward(self):
-        """
-        Distribute the reward after a block lands (counts as one step in this environment),
-        """
-        reward = 1.0
-
-        # Lines cleared reward
-        reward += 35 * self.lines_cleared_landed ** 2
-
-        self.lines_cleared_landed = 0
-
-        return reward 
-
-    def is_hole(self, x, y, highest_row, seen_blocks):
-        """
-        Determines whether or not a space is a "hole" based on the starting location.
-        A hole is defined as empty space that cannot be reached without clearing any rows.
-        We can find holes by propogating outwards until we reach the very top of the grid
-        (or in this case, the top of the highest row that contains a landed block).
-        """
-        seen_blocks.add((x,y))
-
-        left, right, up, down = True, True, True, True
-
-        if y == highest_row:
-            return False
-
-        if (x != 0 and self.grid[y][x-1] != '#') and not (x-1, y) in seen_blocks:
-            left = self.is_hole(x-1, y, highest_row, seen_blocks)
-        if (x != 9 and self.grid[y][x+1] != '#') and not (x+1, y) in seen_blocks:
-            right = self.is_hole(x+1, y, highest_row, seen_blocks)
-        if (y != 21 and self.grid[y+1][x] != '#') and not (x, y+1) in seen_blocks:
-            down = self.is_hole(x, y+1, highest_row, seen_blocks)
-        if (y > highest_row and self.grid[y-1][x] != '#') and not (x, y-1) in seen_blocks:
-            up = self.is_hole(x, y-1, highest_row, seen_blocks)
-
-        return left and right and down and up
+        self.grid = cleared_grid
+        return lines_cleared
 
     # Pygame specific    
     def render(self):
@@ -389,35 +289,181 @@ class Tetris:
         if self.use_pygame:
             py.quit()
 
+class TetrisEnv(Tetris):
+    CLEAR_GRID = np.array([['.' for i in range(10)] for i in range(22)])
+
+    REWARDS = {
+        "survival": 1.0,
+        "clear_row_base": 35,
+        "clear_row_scale": 2.0,
+        "death": 5.0
+    }
+
+    def __init__(self, frame_rate=250, headless=False):
+        super().__init__(frame_rate, not headless)
+        self.grid = TetrisEnv.CLEAR_GRID.copy()
+
+    # Overriden functions
+    def clear_rows(self):
+        cleared_row_idx = np.where(np.all(self.grid == '#', axis=1))
+        lines_cleared = super().clear_rows()
+
+        return lines_cleared, cleared_row_idx
+    
+    def land(self):
+        """
+        Modified fall function that lands the block immediately.
+        Returns the landed block positions
+        """
+        block_positions = np.array(self.controlled_block.get_pixel_pos())
+        self.grid[block_positions[:, 0], block_positions[:, 1]] = '#'
+        self.landed_block_count += 1
+        self.cycle_block()
+        
+        return block_positions
+
+
+    def step(self, action: np.ndarray):
+        """ 
+        Perform the action, and return a ndarray in the form:
+        (obs, reward, terminated)
+
+        In TetrisEnv, an action is performed as picking a rotation for the block's orientation and a column for the block to fall in
+        Takes a 14 dim one-hot vector with:
+         - 0-3: rotation of block
+         - 4-13: column (numbered from 0-9)
+        """
+
+        # Parse action information 
+        rotation = np.argmax(action[:4])
+        column = np.argmax(action[4:14])
+        self.controlled_block.rotation = rotation
+
+        # Land block at column
+        self.controlled_block.pos = (self.controlled_block.pos[0], column)
+
+        # Handle case: block goes out of bound if placed in certain column
+        right_most_block = max(self.controlled_block.get_pixel_pos(), key=lambda row: row[1])
+        if right_most_block > column:
+            # Push position back so that it doesn't violate
+            self.controlled_block.pos = (self.controlled_block.pos[0], self.controlled_block.pos[1] - (right_most_block - column))
+
+        # Update block position
+        block_positions = np.array(self.controlled_block.get_pixel_pos())
+        columns, idx = np.unique(block_positions[:,  1], return_index=True)
+        unique_pos = block_positions[idx]
+        col_heights = np.argmax(self.grid[:, columns[0]:columns[-1] + 1], axis=0)
+
+        # If any blocks collide with already landed ones, terminate
+        if (unique_pos[:, 0], col_heights).any():
+            return np.array([self._get_observation(), TetrisEnv.REWARDS["death"], True])
+        
+        dx = min(col_heights - unique_pos[:, 0])
+        self.controlled_block.pos = (self.controlled_block.pos[0] + dx, self.controlled_block.pos[1])
+
+        # Officially land block!
+        landed_block_positions = self.land()
+
+        # Clear any lines
+        lines_cleared, cleared_row_idx = self.clear_rows()
+
+        # Return MDP step
+        obs = self._get_observation(block_positions=landed_block_positions, lines_cleared=lines_cleared, cleared_row_idx=cleared_row_idx)
+        reward = self._get_reward(lines_cleared)
+
+
+
+    # Environment specific functions
+    def reset(self):
+        """
+        Resets the environment for the next episode
+        """
+        self.grid = TetrisEnv.CLEAR_GRID.copy()
+        self.done = False
+        self.frame_count = 0
+        self.block_queue = []
+        self.landed_block_count = 0
+        self.rows_cleared = 0
+        self.lines_cleared_landed = 0
+
+        self.start()
+        return self._get_observation()
+
+    def _get_observation(self, block_positions, lines_cleared=0, cleared_row_idx=np.array([])):
+        """
+        Returns the visual part of the grid, denoting '.' as 0, '#' as .5, and '$' as 1
+
+        Also contains various other observations like falling block type, rotation, position
+        """
+        rows, cols = self.grid.shape
+        bin_grid = utils.bin_grid(self.grid)
+
+        # Get all terms (normalize if need be)
+
+        col_heights = obs_terms.height_per_column(bin_grid)
+        col_heights_norm = col_heights / 20
+        holes_per_col = (obs_terms.holes_count(bin_grid) / col_heights if col_heights.all() > 0 else np.zeros(10))
+        bumpiness = obs_terms.calc_bumpiness(col_heights) / (rows * (cols - 1))
+        row_transitions, col_transitions = obs_terms.count_transitions(bin_grid)
+        row_transitions /= (rows * (cols + 1))
+        col_transitions /= ((rows + 1) * cols)
+        eroded_cells = obs_terms.eroded_cells(lines_cleared, cleared_row_idx, block_positions, rows)
+        num_wells = obs_terms.cumulative_wells(bin_grid) / (cols * (rows * (rows + 1) // 2)) # Normalized by max number of wells
+        landing_height = obs_terms.landing_height(block_positions, rows) / rows
+
+        # Return observation concatenated altogether
+        return np.concatenate([
+            col_heights_norm.astype(np.float32),
+            holes_per_col.astype(np.float32),
+            np.array([bumpiness], dtype=np.float32),
+            np.array([row_transitions], dtype=np.float32),
+            np.array([col_transitions], dtype=np.float32),
+            np.array([eroded_cells], dtype=np.float32),
+            np.array([num_wells], dtype=np.float32),
+            np.array([landing_height], dtype=np.float32),
+        ])
+
+    
+    def _get_reward(self, lines_cleared):
+        """
+        Distribute the reward after a block lands (counts as one step in this environment),
+        """
+        return TetrisEnv.REWARDS['survival'] + TetrisEnv.REWARDS['clear_row_base'] * (lines_cleared ** TetrisEnv.REWARDS['clear_row_scale'])
+
 # For if the user would like to play on their own
 if __name__ == "__main__":
     # # Test code
     # env = Tetris(use_pygame=False)
 
-    # tetris_grid = [
-    #     ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # row 0 (top)
-    #     ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 1
-    #     ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 2
-    #     ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 3
-    #     ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 4
-    #     ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 5
-    #     ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 6
-    #     ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 7
-    #     ['#', '.', '#', '.', '.', '.', '.', '.', '.', '.'],  # 8
-    #     ['#', '#', '#', '.', '.', '#', '.', '.', '.', '.'],  # 9
-    #     ['#', '.', '#', '.', '#', '#', '.', '.', '.', '.'],  # 10
-    #     ['#', '.', '#', '#', '#', '#', '#', '#', '#', '.'],  # 11
-    #     ['#', '#', '#', '#', '#', '#', '.', '.', '#', '.'],  # 12
-    #     ['#', '#', '#', '#', '#', '#', '#', '.', '#', '.'],
-    #     ['#', '#', '#', '#', '#', '#', '#', '.', '#', '.'],
-    #     ['#', '#', '.', '#', '#', '#', '.', '.', '#', '.'],
-    #     ['#', '#', '.', '#', '#', '#', '.', '.', '#', '.'],
-    #     ['#', '#', '#', '#', '#', '#', '.', '.', '#', '#'],
-    #     ['#', '#', '#', '#', '#', '#', '.', '.', '#', '#'],
-    #     ['#', '#', '#', '#', '#', '#', '.', '.', '#', '#'],
-    #     ['#', '#', '#', '#', '#', '#', '#', '.', '#', '#'],
-    #     ['#', '#', '#', '#', '#', '#', '#', '#', '#', '#'],  # row 21 (bottom)
-    # ]
+    tetris_grid = [
+        ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # row 0 (top)
+        ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 1
+        ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 2
+        ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 3
+        ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 4
+        ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 5
+        ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 6
+        ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.'],  # 7
+        ['#', '.', '#', '.', '.', '.', '.', '.', '.', '.'],  # 8
+        ['#', '#', '#', '.', '.', '#', '.', '.', '.', '.'],  # 9
+        ['#', '.', '#', '.', '#', '#', '.', '.', '.', '.'],  # 10
+        ['#', '.', '#', '#', '#', '#', '#', '#', '#', '.'],  # 11
+        ['#', '#', '#', '#', '#', '#', '.', '.', '#', '.'],  # 12
+        ['#', '#', '#', '#', '#', '#', '#', '.', '#', '.'],
+        ['#', '#', '#', '#', '#', '#', '#', '.', '#', '.'],
+        ['#', '#', '.', '#', '#', '#', '.', '.', '#', '.'],
+        ['#', '#', '.', '#', '#', '#', '.', '.', '#', '.'],
+        ['#', '#', '#', '#', '#', '#', '.', '.', '#', '#'],
+        ['#', '#', '#', '#', '#', '#', '.', '.', '#', '#'],
+        ['#', '#', '#', '#', '#', '#', '.', '.', '#', '#'],
+        ['#', '#', '#', '#', '#', '#', '#', '.', '#', '#'],
+        ['#', '#', '#', '#', '#', '#', '#', '#', '#', '#'],  # row 21 (bottom)
+    ]
+
+    env = TetrisEnv(headless=True)
+    env.grid = np.array(tetris_grid)
+    env.start()
+    print(env._get_observation(np.array(env.controlled_block.get_pixel_pos())))
 
     # env.grid = tetris_grid
     
@@ -442,32 +488,32 @@ if __name__ == "__main__":
     # print(seen_blocks)
     # print(hole_blocks)
 
-    env = Tetris(use_pygame=True)
-    env.start()
+    # env = Tetris(use_pygame=True)
+    # env.start()
 
-    running = True
-    while running:
-        for event in py.event.get():
-            if event.type == py.QUIT:
-                running = False
-            elif event.type == py.KEYDOWN:
-                if event.key == py.K_q:
-                    env.move(Tetris.MOVE_CCW)
-                if event.key == py.K_e:
-                    env.move(Tetris.MOVE_CW)
-                if event.key == py.K_a:
-                    env.move(Tetris.MOVE_LEFT)
-                if event.key == py.K_d:
-                    env.move(Tetris.MOVE_RIGHT)
+    # running = True
+    # while running:
+    #     for event in py.event.get():
+    #         if event.type == py.QUIT:
+    #             running = False
+    #         elif event.type == py.KEYDOWN:
+    #             if event.key == py.K_q:
+    #                 env.move(Tetris.MOVE_CCW)
+    #             if event.key == py.K_e:
+    #                 env.move(Tetris.MOVE_CW)
+    #             if event.key == py.K_a:
+    #                 env.move(Tetris.MOVE_LEFT)
+    #             if event.key == py.K_d:
+    #                 env.move(Tetris.MOVE_RIGHT)
 
-        # Falling behavior (every 4 frames)
-        if env.clock.frame_count % 4 == 0:
-            env.fall()
-            env.clear_rows()
+    #     # Falling behavior (every 4 frames)
+    #     if env.clock.frame_count % 4 == 0:
+    #         env.fall()
+    #         env.clear_rows()
 
-        if env.done:
-            running=False
+    #     if env.done:
+    #         running=False
 
-        env.render()
+    #     env.render()
     
-    env.close()
+    # env.close()
