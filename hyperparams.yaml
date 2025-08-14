@@ -1,9 +1,9 @@
 network:
-  input: 58
-  output: 5
+  input: 26
+  output: 14
 
 agent:
-  action_size: 5
+  action_size: 14
   learning_rate: 0.001 # -> 0.00001
   weight_decay: 0.0001
   gamma: 0.99

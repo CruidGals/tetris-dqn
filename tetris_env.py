@@ -24,7 +24,7 @@ class Block:
 
         self.type = block_type
 
-        # 0 deg: 0 | 90 deg: 1 | 180 deg: 2 | 270 deg: 3 (GOING CCW)
+        # 0 deg: 0 | 90 deg: 1 | 180 deg: 2 | 270 deg: 3 (GOING CW)
         self.rotation = 0
 
         # Tetris is a 22*10 grid (first two rows aren't shown), specify spawn position as the bottom-left corner. Read coordinate left to right, top to bottom
@@ -46,55 +46,55 @@ class Block:
         match self.type:
             case Block.O:
                 # Same regardless of flip status
-                return [(self.pos[0], self.pos[1]), (self.pos[0] + 1, self.pos[1]), (self.pos[0], self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 1)]
+                return [(self.pos[0], self.pos[1]), (self.pos[0] + 1, self.pos[1]), (self.pos[0], self.pos[1] + 1), (self.pos[0] + 1, self.pos[1] + 1)]
             case Block.I:
                 # Only two flip patterns
                 if self.rotation % 2 == 0: # 0 or 180 deg
-                    return [(self.pos[0], self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1), (self.pos[0] + 3, self.pos[1] - 1)]
+                    return [(self.pos[0] - 1, self.pos[1]), (self.pos[0], self.pos[1]), (self.pos[0] + 1, self.pos[1]), (self.pos[0] + 2, self.pos[1])]
                 
-                return [(self.pos[0] + 2, self.pos[1]), (self.pos[0] + 2, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 2), (self.pos[0] + 2, self.pos[1] - 3)]
+                return [(self.pos[0], self.pos[1] - 1), (self.pos[0], self.pos[1]), (self.pos[0], self.pos[1] + 1), (self.pos[0], self.pos[1] + 2)]
             case Block.S:
                 # 2 flip patterns
                 if self.rotation % 2 == 0: # 0 or 180 deg
-                    return [(self.pos[0], self.pos[1]), (self.pos[0] + 1, self.pos[1]), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1)]
+                    return [(self.pos[0], self.pos[1] - 1), (self.pos[0], self.pos[1]), (self.pos[0] - 1, self.pos[1]), (self.pos[0] - 1, self.pos[1] + 1)]
                 
-                return [(self.pos[0] + 1, self.pos[1] - 2), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1])]
+                return [(self.pos[0] - 1, self.pos[1]), (self.pos[0], self.pos[1]), (self.pos[0], self.pos[1] + 1), (self.pos[0] + 1, self.pos[1] + 1)]
             case Block.Z:
                 # 2 flip patterns
                 if self.rotation % 2 == 0: # 0 or 180 deg
-                    return [(self.pos[0], self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1]), (self.pos[0] + 2, self.pos[1])]
+                    return [(self.pos[0] - 1, self.pos[1] - 1), (self.pos[0], self.pos[1] - 1), (self.pos[0], self.pos[1]), (self.pos[0], self.pos[1] + 1)]
                 
-                return [(self.pos[0] + 1, self.pos[1]), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 2)]
+                return [(self.pos[0] + 1, self.pos[1]), (self.pos[0], self.pos[1]), (self.pos[0], self.pos[1] + 1), (self.pos[0] - 1, self.pos[1] + 1)]
             case Block.L:
                 # 4 flip patterns
                 if self.rotation == 0: # 0 deg
-                    return [(self.pos[0], self.pos[1]), (self.pos[0], self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1)]
+                    return [(self.pos[0] - 1, self.pos[1]), (self.pos[0], self.pos[1]), (self.pos[0] + 1, self.pos[1]), (self.pos[0] + 1, self.pos[1] + 1)]
                 elif self.rotation == 1: # 90 deg
-                    return [(self.pos[0] + 1, self.pos[1] - 2), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1]), (self.pos[0] + 2, self.pos[1])]
+                    return [(self.pos[0] + 1, self.pos[1] - 1), (self.pos[0], self.pos[1] - 1), (self.pos[0], self.pos[1]), (self.pos[0], self.pos[1] + 1)]
                 elif self.rotation == 2: # 180 deg
-                    return [(self.pos[0], self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 2)]
+                    return [(self.pos[0] - 1, self.pos[1] - 1), (self.pos[0] - 1, self.pos[1]), (self.pos[0], self.pos[1]), (self.pos[0] + 1, self.pos[1])]
                 else: # 270 deg
-                    return [(self.pos[0], self.pos[1] - 2), (self.pos[0] + 1, self.pos[1] - 2), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1])]
+                    return [(self.pos[0], self.pos[1] - 1), (self.pos[0], self.pos[1]), (self.pos[0], self.pos[1] + 1), (self.pos[0] - 1, self.pos[1] + 1)]
             case Block.J:
                 # 4 flip patterns
                 if self.rotation == 0: # 0 deg
-                    return [(self.pos[0], self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1])]
+                    return [(self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1]), (self.pos[0], self.pos[1]), (self.pos[0] - 1, self.pos[1])]
                 elif self.rotation == 1: # 90 deg
-                    return [(self.pos[0] + 1, self.pos[1]), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 2), (self.pos[0] + 2, self.pos[1] - 2)]
+                    return [(self.pos[0] - 1, self.pos[1] - 1), (self.pos[0], self.pos[1] - 1), (self.pos[0], self.pos[1]), (self.pos[0], self.pos[1] + 1)]
                 elif self.rotation == 2: # 180 deg
-                    return [(self.pos[0], self.pos[1] - 2), (self.pos[0], self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1)]
+                    return [(self.pos[0] + 1, self.pos[1]), (self.pos[0], self.pos[1]), (self.pos[0] - 1, self.pos[1]), (self.pos[0] - 1, self.pos[1] + 1)]
                 else: # 270 deg
-                    return [(self.pos[0], self.pos[1]), (self.pos[0] + 1, self.pos[1]), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 2)]
+                    return [(self.pos[0], self.pos[1] - 1), (self.pos[0], self.pos[1]), (self.pos[0], self.pos[1] + 1), (self.pos[0] + 1, self.pos[1] + 1)]
             case Block.T:
                 # 4 flip patterns
                 if self.rotation == 0: # 0 deg
-                    return [(self.pos[0], self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1])]
+                    return [(self.pos[0], self.pos[1] - 1), (self.pos[0], self.pos[1]), (self.pos[0], self.pos[1] + 1), (self.pos[0] - 1, self.pos[1])]
                 elif self.rotation == 1: # 90 deg
-                    return [(self.pos[0] + 1, self.pos[1] - 2), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1]), (self.pos[0] + 2, self.pos[1] - 1)]
+                    return [(self.pos[0] - 1, self.pos[1]), (self.pos[0], self.pos[1]), (self.pos[0] + 1, self.pos[1]), (self.pos[0], self.pos[1] + 1)]
                 elif self.rotation == 2: # 180 deg
-                    return [(self.pos[0], self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 2, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1] - 2)]
+                    return [(self.pos[0], self.pos[1] - 1), (self.pos[0], self.pos[1]), (self.pos[0], self.pos[1] + 1), (self.pos[0] + 1, self.pos[1])]
                 else: # 270 deg
-                    return [(self.pos[0] + 1, self.pos[1] - 2), (self.pos[0] + 1, self.pos[1] - 1), (self.pos[0] + 1, self.pos[1]), (self.pos[0], self.pos[1] - 1)]
+                    return [(self.pos[0] - 1, self.pos[1]), (self.pos[0], self.pos[1]), (self.pos[0] + 1, self.pos[1]), (self.pos[0], self.pos[1] - 1)]
 
 
 class Tetris:
@@ -305,7 +305,7 @@ class TetrisEnv(Tetris):
 
     # Overriden functions
     def clear_rows(self):
-        cleared_row_idx = np.where(np.all(self.grid == '#', axis=1))
+        cleared_row_idx = np.where(np.all(self.grid == '#', axis=1))[0]
         lines_cleared = super().clear_rows()
 
         return lines_cleared, cleared_row_idx
@@ -334,44 +334,53 @@ class TetrisEnv(Tetris):
          - 4-13: column (numbered from 0-9)
         """
 
+        rows, cols = self.grid.shape
+
         # Parse action information 
-        rotation = np.argmax(action[:4])
-        column = np.argmax(action[4:14])
+        rotation = int(np.argmax(action[:4]))
+        column = int(np.argmax(action[4:14]))
         self.controlled_block.rotation = rotation
 
         # Land block at column
         self.controlled_block.pos = (self.controlled_block.pos[0], column)
 
         # Handle case: block goes out of bound if placed in certain column
-        right_most_block = max(self.controlled_block.get_pixel_pos(), key=lambda row: row[1])
-        if right_most_block > column:
-            # Push position back so that it doesn't violate
-            self.controlled_block.pos = (self.controlled_block.pos[0], self.controlled_block.pos[1] - (right_most_block - column))
+        block_position_cols = np.array(self.controlled_block.get_pixel_pos(), dtype=int)[:, 1]
+        overflow = min(0, block_position_cols.min()) + max(0, block_position_cols.max() - (cols - 1))
+        print(block_position_cols.max())
+        
+        # Push block into the right place
+        self.controlled_block.pos = (self.controlled_block.pos[0], int(self.controlled_block.pos[1] - overflow))
 
         # Update block position
         block_positions = np.array(self.controlled_block.get_pixel_pos())
-        columns, idx = np.unique(block_positions[:,  1], return_index=True)
+
+        # Get highest row pos for each column the block is in
+        cols = block_positions[:,  1]
+        unique_cols = np.unique(cols)
+        idx = [np.where(cols == c)[0][np.argmax(block_positions[cols == c, 0])] for c in unique_cols]
         unique_pos = block_positions[idx]
-        col_heights = np.argmax(self.grid[:, columns[0]:columns[-1] + 1], axis=0)
+        col_heights = np.argmax(self.grid[:, unique_cols[0]:unique_cols[-1] + 1] == '#', axis=0)
 
         # If any blocks collide with already landed ones, terminate
-        if (unique_pos[:, 0], col_heights).any():
+        if np.isin(block_positions[:, 0], col_heights).any():
             return np.array([self._get_observation(), TetrisEnv.REWARDS["death"], True])
         
-        dx = min(col_heights - unique_pos[:, 0])
-        self.controlled_block.pos = (self.controlled_block.pos[0] + dx, self.controlled_block.pos[1])
+        dx = min(col_heights - unique_pos[:, 0]) - 1
+        self.controlled_block.pos = (int(self.controlled_block.pos[0] + dx), self.controlled_block.pos[1])
 
         # Officially land block!
         landed_block_positions = self.land()
 
         # Clear any lines
         lines_cleared, cleared_row_idx = self.clear_rows()
+        self.rows_cleared += lines_cleared
 
         # Return MDP step
         obs = self._get_observation(block_positions=landed_block_positions, lines_cleared=lines_cleared, cleared_row_idx=cleared_row_idx)
         reward = self._get_reward(lines_cleared)
 
-
+        return obs, reward, False
 
     # Environment specific functions
     def reset(self):
@@ -384,7 +393,6 @@ class TetrisEnv(Tetris):
         self.block_queue = []
         self.landed_block_count = 0
         self.rows_cleared = 0
-        self.lines_cleared_landed = 0
 
         self.start()
         return self._get_observation()
@@ -448,22 +456,27 @@ if __name__ == "__main__":
         ['#', '#', '#', '.', '.', '#', '.', '.', '.', '.'],  # 9
         ['#', '.', '#', '.', '#', '#', '.', '.', '.', '.'],  # 10
         ['#', '.', '#', '#', '#', '#', '#', '#', '#', '.'],  # 11
-        ['#', '#', '#', '#', '#', '#', '.', '.', '#', '.'],  # 12
-        ['#', '#', '#', '#', '#', '#', '#', '.', '#', '.'],
-        ['#', '#', '#', '#', '#', '#', '#', '.', '#', '.'],
+        ['#', '#', '#', '#', '#', '#', '#', '#', '#', '.'],  # 12
+        ['#', '#', '#', '#', '#', '#', '#', '#', '#', '.'],
+        ['#', '#', '#', '#', '#', '#', '#', '#', '#', '.'],
         ['#', '#', '.', '#', '#', '#', '.', '.', '#', '.'],
         ['#', '#', '.', '#', '#', '#', '.', '.', '#', '.'],
         ['#', '#', '#', '#', '#', '#', '.', '.', '#', '#'],
         ['#', '#', '#', '#', '#', '#', '.', '.', '#', '#'],
         ['#', '#', '#', '#', '#', '#', '.', '.', '#', '#'],
         ['#', '#', '#', '#', '#', '#', '#', '.', '#', '#'],
-        ['#', '#', '#', '#', '#', '#', '#', '#', '#', '#'],  # row 21 (bottom)
+        ['#', '#', '#', '#', '#', '#', '#', '.', '#', '#'],  # row 21 (bottom)
     ]
 
     env = TetrisEnv(headless=True)
     env.grid = np.array(tetris_grid)
     env.start()
-    print(env._get_observation(np.array(env.controlled_block.get_pixel_pos())))
+    env.controlled_block = Block(Block.I)
+    print(env.grid)
+
+    obs, rew, term = env.step(np.array([0,1,0,0,0,0,0,0,1,0,0,0,0,0]))
+    print(env.grid)
+    print(obs, rew, term)
 
     # env.grid = tetris_grid
     

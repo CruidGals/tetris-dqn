@@ -4,7 +4,7 @@ import time
 import numpy as np
 import os
 from dqn import DQNAgent
-from tetris_env import Tetris
+from tetris_env import TetrisEnv
 
 def train(config):
     """
@@ -37,7 +37,7 @@ def train(config):
         decay_rate=config['agent']['decay_rate']
     )
 
-    env = Tetris(use_pygame=config['training']['render'])
+    env = TetrisEnv(use_pygame=config['training']['render'])
     best_reward = -np.inf
     best_episode = 0
     best_episode_replay = None
@@ -50,10 +50,7 @@ def train(config):
         frame_count = 0
 
         # Keep track of the states in this episode (replay is the first 200 dims)
-        episode_replay = [state[:200]]
-
-        # Accumulate rewards until landed
-        reward = 0
+        episode_replay = [env.grid.copy()]
 
         # Run episode until max length of ~30 seconds
         start_time = time.time()
@@ -69,42 +66,18 @@ def train(config):
             # Start the training process
             action = agent.act(state)
 
-            # Capture state and result
-            next_state = env.move(action)
-            episode_replay.append(next_state[:200])
-
-            # Falling behavior (every 2 frames)
-            if frame_count % 1 == 0:
-                block_landed = env.fall()
-
-            done = env.done
-            
-            if block_landed:
-                # Put lines cleared in state
-                env.clear_rows()
-                reward += env.distribute_reward()
-
-                # Game over penalty
-                if done:
-                    reward -= 5.0
-
-                agent.remember((state, action, reward, next_state, done))
-                total_reward += reward
-                reward = 0
-
-                # Do a training burst
-                loss = agent.train()
-                ep_loss += loss if loss else 0
+            # Capture step the env:
+            obs, rew, term = env.step(action)
+            episode_replay.append(env.grid.copy())
+            agent.remember((state, action, rew, obs, term))
+            total_reward += rew
 
             if config['training']['render']:
                 env.render()
 
-            if done:
+            if term:
                 break
-
-            # Achieve UPS = 1.5, where K + B = UPS;
-            # K represents number of times trained after landed (K = 1)
-            # B represents times to train in background (frames to land / train interval) ~ 80 frames
+            
             if frame_count % 40 == 0:
                 loss = agent.train()
                 ep_loss += loss if loss else 0

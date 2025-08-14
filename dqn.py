@@ -10,7 +10,7 @@ from model import DQNModel
 from collections import deque
 
 class DQNAgent:
-    def __init__(self, input=200, output=5, action_size=5, learning_rate=1e-4, weight_decay=1e-3, gamma=0.99, batch_size=256, replay_buffer_size=100000,
+    def __init__(self, input=26, output=14, action_size=14, learning_rate=1e-4, weight_decay=1e-3, gamma=0.99, batch_size=256, replay_buffer_size=100000,
                  min_buffer_before_training=5000, target_update=10, epsilon=1.0, epsilon_min=0.1, lr_gamma=0.5, lr_step_size=400, lr_end=0.00001, decay_rate=0.995):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.action_size = action_size
