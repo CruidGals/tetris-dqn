@@ -58,7 +58,7 @@ def train(config):
         max_time = config['training']['max_episode_length']
 
         while prev_time - start_time < max_time:
-            time.sleep(1/1000)
+            time.sleep(1 / 1000)
             
             # Update current_time
             prev_time = time.time()
@@ -78,9 +78,8 @@ def train(config):
             if term:
                 break
             
-            if frame_count % 20 == 0:
-                loss = agent.train()
-                ep_loss += loss if loss else 0
+            loss = agent.train()
+            ep_loss += loss if loss else 0
             
             state = obs
             frame_count += 1

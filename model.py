@@ -6,9 +6,9 @@ class DQNModel(nn.Module):
         super(DQNModel, self).__init__()
 
         self.net = nn.Sequential(nn.Linear(input, 256), nn.ReLU(),
+                                 nn.Linear(256, 256), nn.ReLU(),
                                  nn.Linear(256, 128), nn.ReLU(),
-                                 nn.Linear(128, 64), nn.ReLU(),
-                                 nn.Linear(64, output))
+                                 nn.Linear(128, output))
 
         # self.net = nn.Sequential(nn.Conv2d(1, 16, kernel_size=3, padding=1), nn.ReLU(),
         #                          nn.Conv2d(16, 32, kernel_size=3, padding=1), nn.ReLU(),     

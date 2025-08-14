@@ -316,12 +316,13 @@ class TetrisEnv(Tetris):
         Modified fall function that lands the block immediately.
         Returns the landed block positions
         """
+        block_type = self.controlled_block.type
         block_positions = np.array(self.controlled_block.get_pixel_pos())
         self.grid[block_positions[:, 0], block_positions[:, 1]] = '#'
         self.landed_block_count += 1
         self.cycle_block()
         
-        return block_positions
+        return block_positions, block_type
 
 
     def step(self, action: int):
@@ -368,20 +369,21 @@ class TetrisEnv(Tetris):
 
         # If any blocks collide with already landed ones, terminate
         if np.isin(block_positions[:, 0], col_heights).any():
-            return self._get_observation(block_positions), TetrisEnv.REWARDS["death"], True
+            return self._get_observation(block_positions, self.controlled_block.type), TetrisEnv.REWARDS["death"], True
         
         dy = min(col_heights - unique_pos[:, 0]) - 1
         self.controlled_block.pos = (int(self.controlled_block.pos[0] + dy), self.controlled_block.pos[1])
 
         # Officially land block!
-        landed_block_positions = self.land()
+        landed_block_positions, landed_block_type = self.land()
         lines_cleared, cleared_row_idx = self.clear_rows()
 
         # Return MDP step
-        obs = self._get_observation(block_positions=landed_block_positions, lines_cleared=lines_cleared, cleared_row_idx=cleared_row_idx)
+        obs = self._get_observation(block_positions=landed_block_positions, block_type=landed_block_type, lines_cleared=lines_cleared, cleared_row_idx=cleared_row_idx)
         reward = self._get_reward(lines_cleared)
+        term = np.any(obs_terms.height_per_column(utils.bin_grid(self.grid)) >= 20) # If any of heights are 20 or above
 
-        return obs, reward, False
+        return obs, reward, term
 
     # Environment specific functions
     def reset(self):
@@ -396,9 +398,9 @@ class TetrisEnv(Tetris):
         self.rows_cleared = 0
 
         self.start()
-        return self._get_observation(np.array(self.controlled_block.get_pixel_pos()))
+        return self._get_observation(np.array(self.controlled_block.get_pixel_pos()), self.controlled_block.type)
 
-    def _get_observation(self, block_positions, lines_cleared=0, cleared_row_idx=np.array([])):
+    def _get_observation(self, block_positions, block_type, lines_cleared=0, cleared_row_idx=np.array([])):
         """
         Returns the visual part of the grid, denoting '.' as 0, '#' as .5, and '$' as 1
 
@@ -408,7 +410,7 @@ class TetrisEnv(Tetris):
         bin_grid = utils.bin_grid(self.grid)
 
         # Get all terms (normalize if need be)
-
+        block_type = utils.one_hot(7, block_type)
         col_heights = obs_terms.height_per_column(bin_grid)
         col_heights_norm = col_heights / 20
         holes_per_col = (obs_terms.holes_count(bin_grid) / col_heights if col_heights.all() > 0 else np.zeros(10))
@@ -422,6 +424,7 @@ class TetrisEnv(Tetris):
 
         # Return observation concatenated altogether
         return np.concatenate([
+            block_type.astype(np.float32),
             col_heights_norm.astype(np.float32),
             holes_per_col.astype(np.float32),
             np.array([bumpiness], dtype=np.float32),
