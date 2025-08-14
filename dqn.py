@@ -96,12 +96,11 @@ class DQNAgent:
         batch = random.sample(self.replay_memory, self.batch_size)
         states, actions, rewards, next_states, dones = zip(*batch)
 
+        # Convert to GPU-accelerated tensors
         states = torch.FloatTensor(np.array(states)).to(self.device)
         actions = torch.LongTensor(np.array(actions)).unsqueeze(1).to(self.device)
         rewards = torch.FloatTensor(np.array(rewards)).to(self.device)
         next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
-
-        # The "dones" array contains booleans that indicate whether if the next state stops the episode
         dones = torch.FloatTensor(np.array(dones)).to(self.device)
 
         curr_q_vals = self.model(states).gather(1, actions)

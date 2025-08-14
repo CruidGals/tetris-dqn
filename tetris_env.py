@@ -307,6 +307,7 @@ class TetrisEnv(Tetris):
     def clear_rows(self):
         cleared_row_idx = np.where(np.all(self.grid == '#', axis=1))[0]
         lines_cleared = super().clear_rows()
+        self.rows_cleared += lines_cleared
 
         return lines_cleared, cleared_row_idx
     
@@ -323,33 +324,33 @@ class TetrisEnv(Tetris):
         return block_positions
 
 
-    def step(self, action: np.ndarray):
+    def step(self, action: int):
         """ 
         Perform the action, and return a ndarray in the form:
         (obs, reward, terminated)
 
         In TetrisEnv, an action is performed as picking a rotation for the block's orientation and a column for the block to fall in
-        Takes a 14 dim one-hot vector with:
-         - 0-3: rotation of block
-         - 4-13: column (numbered from 0-9)
+        Action is taken from a 40 dim one-hot vector where indices:
+        - 0-9: Column # with rotation 0
+        - 10-19: Column # with rotation 1
+        - 20-29: Column # with rotation 2
+        - 30-39: Column # with rotation 3
         """
 
         rows, cols = self.grid.shape
 
-        # Parse action information 
-        rotation = int(np.argmax(action[:4]))
-        column = int(np.argmax(action[4:14]))
+        # Parse action information: Tens digit is rotation, Ones digit is column number
+        action_temp = str(action)
+        rotation = int(action_temp[0]) if len(action_temp) > 1 else 0
+        column = int(action_temp[1]) if len(action_temp) > 1 else int(action_temp[0])
+        
+        # Position the block
         self.controlled_block.rotation = rotation
-
-        # Land block at column
         self.controlled_block.pos = (self.controlled_block.pos[0], column)
 
         # Handle case: block goes out of bound if placed in certain column
         block_position_cols = np.array(self.controlled_block.get_pixel_pos(), dtype=int)[:, 1]
         overflow = min(0, block_position_cols.min()) + max(0, block_position_cols.max() - (cols - 1))
-        print(block_position_cols.max())
-        
-        # Push block into the right place
         self.controlled_block.pos = (self.controlled_block.pos[0], int(self.controlled_block.pos[1] - overflow))
 
         # Update block position
@@ -360,21 +361,21 @@ class TetrisEnv(Tetris):
         unique_cols = np.unique(cols)
         idx = [np.where(cols == c)[0][np.argmax(block_positions[cols == c, 0])] for c in unique_cols]
         unique_pos = block_positions[idx]
-        col_heights = np.argmax(self.grid[:, unique_cols[0]:unique_cols[-1] + 1] == '#', axis=0)
+
+        # Get col heights (inverted)
+        selected_columns = self.grid[:, unique_cols[0]:unique_cols[-1] + 1] == '#'
+        col_heights = np.where(np.any(selected_columns, axis=0), np.argmax(selected_columns, axis=0), rows)
 
         # If any blocks collide with already landed ones, terminate
         if np.isin(block_positions[:, 0], col_heights).any():
-            return np.array([self._get_observation(), TetrisEnv.REWARDS["death"], True])
+            return self._get_observation(block_positions), TetrisEnv.REWARDS["death"], True
         
-        dx = min(col_heights - unique_pos[:, 0]) - 1
-        self.controlled_block.pos = (int(self.controlled_block.pos[0] + dx), self.controlled_block.pos[1])
+        dy = min(col_heights - unique_pos[:, 0]) - 1
+        self.controlled_block.pos = (int(self.controlled_block.pos[0] + dy), self.controlled_block.pos[1])
 
         # Officially land block!
         landed_block_positions = self.land()
-
-        # Clear any lines
         lines_cleared, cleared_row_idx = self.clear_rows()
-        self.rows_cleared += lines_cleared
 
         # Return MDP step
         obs = self._get_observation(block_positions=landed_block_positions, lines_cleared=lines_cleared, cleared_row_idx=cleared_row_idx)
@@ -395,7 +396,7 @@ class TetrisEnv(Tetris):
         self.rows_cleared = 0
 
         self.start()
-        return self._get_observation()
+        return self._get_observation(np.array(self.controlled_block.get_pixel_pos()))
 
     def _get_observation(self, block_positions, lines_cleared=0, cleared_row_idx=np.array([])):
         """
@@ -461,20 +462,20 @@ if __name__ == "__main__":
         ['#', '#', '#', '#', '#', '#', '#', '#', '#', '.'],
         ['#', '#', '.', '#', '#', '#', '.', '.', '#', '.'],
         ['#', '#', '.', '#', '#', '#', '.', '.', '#', '.'],
-        ['#', '#', '#', '#', '#', '#', '.', '.', '#', '#'],
-        ['#', '#', '#', '#', '#', '#', '.', '.', '#', '#'],
-        ['#', '#', '#', '#', '#', '#', '.', '.', '#', '#'],
-        ['#', '#', '#', '#', '#', '#', '#', '.', '#', '#'],
-        ['#', '#', '#', '#', '#', '#', '#', '.', '#', '#'],  # row 21 (bottom)
+        ['#', '#', '#', '#', '#', '#', '.', '.', '#', '.'],
+        ['#', '#', '#', '#', '#', '#', '.', '.', '#', '.'],
+        ['#', '#', '#', '#', '#', '#', '.', '.', '#', '.'],
+        ['#', '#', '#', '#', '#', '#', '#', '.', '#', '.'],
+        ['#', '#', '#', '#', '#', '#', '#', '.', '#', '.'],  # row 21 (bottom)
     ]
 
     env = TetrisEnv(headless=True)
     env.grid = np.array(tetris_grid)
     env.start()
-    env.controlled_block = Block(Block.I)
+    env.controlled_block = Block(Block.J)
     print(env.grid)
 
-    obs, rew, term = env.step(np.array([0,1,0,0,0,0,0,0,1,0,0,0,0,0]))
+    obs, rew, term = env.step(9)
     print(env.grid)
     print(obs, rew, term)
 

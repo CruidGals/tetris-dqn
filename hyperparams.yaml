@@ -1,9 +1,9 @@
 network:
   input: 26
-  output: 14
+  output: 40
 
 agent:
-  action_size: 14
+  action_size: 40
   learning_rate: 0.001 # -> 0.00001
   weight_decay: 0.0001
   gamma: 0.99
@@ -22,7 +22,7 @@ agent:
 training:
   episodes: 2000
   max_episode_length: 30 # Max episode length in seconds
-  render: False
+  render: True
 
 evaluation:
   episodes: 50

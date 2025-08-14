@@ -37,7 +37,7 @@ def train(config):
         decay_rate=config['agent']['decay_rate']
     )
 
-    env = TetrisEnv(use_pygame=config['training']['render'])
+    env = TetrisEnv(headless=(not config['training']['render']))
     best_reward = -np.inf
     best_episode = 0
     best_episode_replay = None
@@ -58,7 +58,7 @@ def train(config):
         max_time = config['training']['max_episode_length']
 
         while prev_time - start_time < max_time:
-            time.sleep(1./480.)
+            time.sleep(1/1000)
             
             # Update current_time
             prev_time = time.time()
@@ -78,11 +78,11 @@ def train(config):
             if term:
                 break
             
-            if frame_count % 40 == 0:
+            if frame_count % 20 == 0:
                 loss = agent.train()
                 ep_loss += loss if loss else 0
             
-            state = next_state
+            state = obs
             frame_count += 1
 
         if total_reward > best_reward:

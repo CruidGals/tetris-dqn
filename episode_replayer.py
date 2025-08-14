@@ -6,7 +6,7 @@ from tetris_env import Tetris
 def replay(arr):
     # Make into iterator for easy access
     arr = iter(arr)
-    mapping = {0.0: '.', 0.5: '$', 1.0: '#'}
+    mapping = {'.': '.', '$': '$', '#': '#'}
 
     # Pygame boilerplate
     py.init()
@@ -39,7 +39,7 @@ def replay(arr):
 
         py.display.flip()
 
-        game_clock.tick(30)
+        game_clock.tick(2)
 
     py.quit()
 
