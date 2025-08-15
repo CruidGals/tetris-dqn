@@ -4,10 +4,10 @@ network:
 
 agent:
   action_size: 40
-  learning_rate: 0.00001 # -> 0.00001
+  learning_rate: 0.001 # -> 0.00001
   weight_decay: 0.0001
   gamma: 0.99
-  batch_size: 128
+  batch_size: 64
   replay_buffer_size: 50000
   min_buffer_before_training: 500
   target_update_rate: 7

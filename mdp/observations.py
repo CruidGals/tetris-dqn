@@ -95,13 +95,8 @@ def eroded_cells(lines_cleared, cleared_rows_idx, block_positions, height):
 
     if lines_cleared == 0 or len(cleared_rows_idx) == 0:
         return 0
-    # bounds-safe mask for the 4 y's
-    ys = block_positions[:, 1]
-    in_bounds = (ys >= 0) & (ys < height)
-    ys = ys[in_bounds]
-
-    cleared_set = set(int(i) for i in cleared_rows_idx)
-    touched = sum(int(y in cleared_set) for y in ys)    # how many piece blocks are in cleared rows
+    
+    touched = np.isin(block_positions[:, 0], cleared_rows_idx).sum()
     return int(lines_cleared * touched)
 
 def height_per_column(grid):

@@ -22,5 +22,7 @@ class DQNModel(nn.Module):
         return self.net(X)
         
 def init_params(module):
-        if type(module) == nn.Linear or type(module) == nn.Conv2d or type(module) == nn.LazyConv2d or type(module) == nn.LazyLinear:
-            nn.init.normal_(module.weight)
+    if type(module) == nn.Linear or type(module) == nn.Conv2d or type(module) == nn.LazyConv2d or type(module) == nn.LazyLinear:
+        nn.init.kaiming_uniform_(module.weight, nonlinearity="relu")
+        if module.bias is not None:
+            nn.init.zeros_(module.bias)

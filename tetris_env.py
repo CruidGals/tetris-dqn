@@ -418,7 +418,7 @@ class TetrisEnv(Tetris):
         row_transitions, col_transitions = obs_terms.count_transitions(bin_grid)
         row_transitions /= (rows * (cols + 1))
         col_transitions /= ((rows + 1) * cols)
-        eroded_cells = obs_terms.eroded_cells(lines_cleared, cleared_row_idx, block_positions, rows)
+        eroded_cells = obs_terms.eroded_cells(lines_cleared, cleared_row_idx, block_positions, rows) / 16 # Max number of eroded cells possible
         num_wells = obs_terms.cumulative_wells(bin_grid) / (cols * (rows * (rows + 1) // 2)) # Normalized by max number of wells
         landing_height = obs_terms.landing_height(block_positions, rows) / rows
 
@@ -464,23 +464,24 @@ if __name__ == "__main__":
         ['#', '#', '#', '#', '#', '#', '#', '#', '#', '.'],
         ['#', '#', '#', '#', '#', '#', '#', '#', '#', '.'],
         ['#', '#', '.', '#', '#', '#', '.', '.', '#', '.'],
-        ['#', '#', '.', '#', '#', '#', '.', '.', '#', '.'],
-        ['#', '#', '#', '#', '#', '#', '.', '.', '#', '.'],
-        ['#', '#', '#', '#', '#', '#', '.', '.', '#', '.'],
-        ['#', '#', '#', '#', '#', '#', '.', '.', '#', '.'],
-        ['#', '#', '#', '#', '#', '#', '#', '.', '#', '.'],
-        ['#', '#', '#', '#', '#', '#', '#', '.', '#', '.'],  # row 21 (bottom)
+        ['#', '#', '.', '#', '#', '#', '.', '.', '#', '#'],
+        ['#', '#', '#', '#', '#', '#', '.', '.', '#', '#'],
+        ['#', '#', '#', '#', '#', '#', '.', '.', '#', '#'],
+        ['#', '#', '#', '#', '#', '#', '.', '.', '#', '#'],
+        ['#', '#', '#', '#', '#', '#', '#', '.', '#', '#'],
+        ['#', '#', '#', '#', '#', '#', '#', '.', '#', '#'],  # row 21 (bottom)
     ]
 
     env = TetrisEnv(headless=True)
     env.grid = np.array(tetris_grid)
     env.start()
-    env.controlled_block = Block(Block.J)
+    env.controlled_block = Block(Block.I)
     print(env.grid)
 
     obs, rew, term = env.step(9)
     print(env.grid)
     print(obs, rew, term)
+
 
     # env.grid = tetris_grid
     
