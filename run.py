@@ -67,7 +67,7 @@ def train(config):
             action = agent.act(state)
 
             # Capture step the env:
-            obs, rew, term = env.step(action)
+            obs, rew, term = env.step(action, state)
             episode_replay.append(env.grid.copy())
             agent.remember((state, action, rew, obs, term))
             total_reward += rew
@@ -78,8 +78,9 @@ def train(config):
             if term:
                 break
             
-            loss = agent.train()
-            ep_loss += loss if loss else 0
+            if frame_count % 10 == 0:
+                loss = agent.train()
+                ep_loss += loss if loss else 0
             
             state = obs
             frame_count += 1

@@ -5,7 +5,7 @@ from tetris_env import Tetris
 
 def replay(arr):
     # Make into iterator for easy access
-    arr = iter(arr)
+    arr = iter(arr[:, 2:, :])
     mapping = {'.': '.', '$': '$', '#': '#'}
 
     # Pygame boilerplate

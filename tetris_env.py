@@ -293,10 +293,21 @@ class TetrisEnv(Tetris):
     CLEAR_GRID = np.array([['.' for i in range(10)] for i in range(22)])
 
     REWARDS = {
-        "survival": 1.0,
+        "survival": 0.5,
         "clear_row_base": 35,
         "clear_row_scale": 2.0,
-        "death": 5.0
+        "death": -10.0,
+
+        # Observation weights
+        "mean_height": +0.00,
+        "holes":       -0.50,
+        "bumpiness":   -0.15,
+        "row_tr":      -0.10,
+        "col_tr":      -0.15,
+        "eroded":      +0.60,
+        "wells":       -0.15,
+        "landing":     -0.05,
+
     }
 
     def __init__(self, frame_rate=250, headless=False):
@@ -325,7 +336,7 @@ class TetrisEnv(Tetris):
         return block_positions, block_type
 
 
-    def step(self, action: int):
+    def step(self, action: int, prev_obs):
         """ 
         Perform the action, and return a ndarray in the form:
         (obs, reward, terminated)
@@ -336,6 +347,8 @@ class TetrisEnv(Tetris):
         - 10-19: Column # with rotation 1
         - 20-29: Column # with rotation 2
         - 30-39: Column # with rotation 3
+
+        Previous observation is also taken to calculate the delta for rewards
         """
 
         rows, cols = self.grid.shape
@@ -380,7 +393,7 @@ class TetrisEnv(Tetris):
 
         # Return MDP step
         obs = self._get_observation(block_positions=landed_block_positions, block_type=landed_block_type, lines_cleared=lines_cleared, cleared_row_idx=cleared_row_idx)
-        reward = self._get_reward(lines_cleared)
+        reward = self._get_reward(lines_cleared, obs - prev_obs)
         term = np.any(obs_terms.height_per_column(utils.bin_grid(self.grid)) >= 20) # If any of heights are 20 or above
 
         return obs, reward, term
@@ -436,11 +449,24 @@ class TetrisEnv(Tetris):
         ])
 
     
-    def _get_reward(self, lines_cleared):
+    def _get_reward(self, lines_cleared, d_obs):
         """
         Distribute the reward after a block lands (counts as one step in this environment),
         """
-        return TetrisEnv.REWARDS['survival'] + TetrisEnv.REWARDS['clear_row_base'] * (lines_cleared ** TetrisEnv.REWARDS['clear_row_scale'])
+        reward = TetrisEnv.REWARDS['survival']
+        reward += TetrisEnv.REWARDS['clear_row_base'] * (lines_cleared ** TetrisEnv.REWARDS['clear_row_scale'])
+
+        # Delta observation rewards
+        reward += TetrisEnv.REWARDS['mean_height'] * d_obs[7:17].mean()
+        reward += TetrisEnv.REWARDS['holes']       * d_obs[17:27].sum()
+        reward += TetrisEnv.REWARDS['bumpiness']   * d_obs[27]
+        reward += TetrisEnv.REWARDS['row_tr']      * d_obs[28]
+        reward += TetrisEnv.REWARDS['col_tr']      * d_obs[29]
+        reward += TetrisEnv.REWARDS['eroded']      * d_obs[30]
+        reward += TetrisEnv.REWARDS['wells']       * d_obs[31]
+        reward += TetrisEnv.REWARDS['landing']     * d_obs[32]
+
+        return  reward
 
 # For if the user would like to play on their own
 if __name__ == "__main__":
@@ -476,9 +502,10 @@ if __name__ == "__main__":
     env.grid = np.array(tetris_grid)
     env.start()
     env.controlled_block = Block(Block.I)
+    state = env._get_observation(np.array(env.controlled_block.get_pixel_pos()), env.controlled_block.type)
     print(env.grid)
 
-    obs, rew, term = env.step(9)
+    obs, rew, term = env.step(9, state)
     print(env.grid)
     print(obs, rew, term)
 
