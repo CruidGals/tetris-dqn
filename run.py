@@ -77,10 +77,9 @@ def train(config):
 
             if term:
                 break
-            
-            if frame_count % 10 == 0:
-                loss = agent.train()
-                ep_loss += loss if loss else 0
+
+            loss = agent.train()
+            ep_loss += loss if loss else 0
             
             state = obs
             frame_count += 1
