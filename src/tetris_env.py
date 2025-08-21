@@ -292,8 +292,8 @@ class TetrisEnv(Tetris):
     CLEAR_GRID = np.array([['.' for i in range(10)] for i in range(22)])
 
     REWARDS = {
-        "survival": 0.0,
-        "clear_row_base": 5.0,
+        "survival": 1.0,
+        "clear_row_base": 35.0,
         "clear_row_scale": 2.0,
         "death": -5.0,
 
@@ -314,34 +314,30 @@ class TetrisEnv(Tetris):
         self.grid = TetrisEnv.CLEAR_GRID.copy()
 
     # Overriden functions
-    def clear_rows(self):
-        cleared_row_idx = np.where(np.all(self.grid == '#', axis=1))[0]
+    def clear_rows(self, grid):
+        cleared_row_idx = np.where(np.all(grid == '#', axis=1))[0]
         lines_cleared = super().clear_rows()
-        self.rows_cleared += lines_cleared
-
         return lines_cleared, cleared_row_idx
     
-    def land(self):
+    def land(self, grid: np.ndarray, block: Block):
         """
         Modified fall function that lands the block immediately.
         Returns the landed block positions
         """
-        block_type = self.controlled_block.type
-        block_positions = np.array(self.controlled_block.get_pixel_pos())
-        self.grid[block_positions[:, 0], block_positions[:, 1]] = '#'
-        self.landed_block_count += 1
-        self.cycle_block()
+        block_type = block.type
+        block_positions = np.array(block.get_pixel_pos())
+        grid[block_positions[:, 0], block_positions[:, 1]] = '#'
         
         return block_positions, block_type
 
-    def _fall(self, action):
+    def fall(self, action, grid: np.ndarray, block: Block):
         """
         Helper function to position the block correctly based on action and "place" the block into the fallen position
 
         Returns false if terminated
         """
 
-        rows, cols = self.grid.shape
+        rows, cols = grid.shape
 
         # Parse action information: Tens digit is rotation, Ones digit is column number
         action_temp = str(action)
@@ -349,16 +345,16 @@ class TetrisEnv(Tetris):
         column = int(action_temp[1]) if len(action_temp) > 1 else int(action_temp[0])
         
         # Position the block
-        self.controlled_block.rotation = rotation
-        self.controlled_block.pos = (self.controlled_block.pos[0], column)
+        block.rotation = rotation
+        block.pos = (block.pos[0], column)
 
         # Handle case: block goes out of bound if placed in certain column
-        block_position_cols = np.array(self.controlled_block.get_pixel_pos(), dtype=int)[:, 1]
+        block_position_cols = np.array(block.get_pixel_pos(), dtype=int)[:, 1]
         overflow = min(0, block_position_cols.min()) + max(0, block_position_cols.max() - (cols - 1))
-        self.controlled_block.pos = (self.controlled_block.pos[0], int(self.controlled_block.pos[1] - overflow))
+        block.pos = (block.pos[0], int(block.pos[1] - overflow))
 
         # Update block position
-        block_positions = np.array(self.controlled_block.get_pixel_pos())
+        block_positions = np.array(block.get_pixel_pos())
 
         # Get highest row pos for each column the block is in
         cols = block_positions[:,  1]
@@ -367,18 +363,18 @@ class TetrisEnv(Tetris):
         unique_pos = block_positions[idx]
 
         # Get col heights (inverted)
-        selected_columns = self.grid[:, unique_cols[0]:unique_cols[-1] + 1] == '#'
+        selected_columns = grid[:, unique_cols[0]:unique_cols[-1] + 1] == '#'
         col_heights = np.where(np.any(selected_columns, axis=0), np.argmax(selected_columns, axis=0), rows)
 
         # If any blocks collide with already landed ones, terminate
-        if np.any(self.grid[block_positions[:, 0], block_positions[:, 1]] == '#'):
+        if np.any(grid[block_positions[:, 0], block_positions[:, 1]] == '#'):
             return False
         
         dy = min(col_heights - unique_pos[:, 0]) - 1
-        self.controlled_block.pos = (int(self.controlled_block.pos[0] + dy), self.controlled_block.pos[1])
+        block.pos = (int(block.pos[0] + dy), block.pos[1])
         return True
 
-    def step(self, action: int, prev_obs):
+    def step(self, action: int):
         """ 
         Perform the action, and return a ndarray in the form:
         (obs, reward, terminated)
@@ -394,16 +390,19 @@ class TetrisEnv(Tetris):
         """
 
         # Make the block fall in the column
-        if not self._fall(action):
+        if not self.fall(action, self.grid, self.controlled_block):
             return self._get_observation(np.array(self.controlled_block.get_pixel_pos()), self.controlled_block.type), TetrisEnv.REWARDS['death'], True
 
         # Officially land block!
-        landed_block_positions, landed_block_type = self.land()
-        lines_cleared, cleared_row_idx = self.clear_rows()
+        landed_block_positions, landed_block_type = self.land(self.grid, self.controlled_block)
+        lines_cleared, cleared_row_idx = self.clear_rows(self.grid)
+        self.cycle_block()
+        self.landed_block_count += 1
+        self.rows_cleared += lines_cleared
 
         # Return MDP step
         obs = self._get_observation(block_positions=landed_block_positions, block_type=landed_block_type, lines_cleared=lines_cleared, cleared_row_idx=cleared_row_idx)
-        reward = self._get_reward(lines_cleared, obs - prev_obs)
+        reward = self._get_reward(lines_cleared, obs)
         term = np.any(obs_terms.height_per_column(utils.bin_grid(self.grid)) >= 20) # If any of heights are 20 or above
 
         return obs, reward, term
@@ -459,7 +458,7 @@ class TetrisEnv(Tetris):
         ])
 
     
-    def _get_reward(self, lines_cleared, d_obs):
+    def _get_reward(self, lines_cleared, obs):
         """
         Distribute the reward after a block lands (counts as one step in this environment),
         """
@@ -467,16 +466,40 @@ class TetrisEnv(Tetris):
         reward += TetrisEnv.REWARDS['clear_row_base'] * (lines_cleared ** TetrisEnv.REWARDS['clear_row_scale'])
 
         # Delta observation rewards
-        reward += TetrisEnv.REWARDS['mean_height'] * d_obs[7:17].mean()
-        reward += TetrisEnv.REWARDS['holes']       * d_obs[17:27].sum()
-        reward += TetrisEnv.REWARDS['bumpiness']   * d_obs[27]
-        reward += TetrisEnv.REWARDS['row_tr']      * d_obs[28]
-        reward += TetrisEnv.REWARDS['col_tr']      * d_obs[29]
-        reward += TetrisEnv.REWARDS['eroded']      * d_obs[30]
-        reward += TetrisEnv.REWARDS['wells']       * d_obs[31]
-        reward += TetrisEnv.REWARDS['landing']     * d_obs[32]
+        # reward += TetrisEnv.REWARDS['mean_height'] * obs[7:17].mean()
+        # reward += TetrisEnv.REWARDS['holes']       * obs[17:27].sum()
+        # reward += TetrisEnv.REWARDS['bumpiness']   * obs[27]
+        # reward += TetrisEnv.REWARDS['row_tr']      * obs[28]
+        # reward += TetrisEnv.REWARDS['col_tr']      * obs[29]
+        # reward += TetrisEnv.REWARDS['eroded']      * obs[30]
+        # reward += TetrisEnv.REWARDS['wells']       * obs[31]
+        # reward += TetrisEnv.REWARDS['landing']     * obs[32]
 
         return reward
+    
+    def get_possible_obs(self, grid: np.ndarray, block: Block):
+        """
+        For each possible action, return the observation once the action has been made.
+        The index in the observations array correspond to the action made
+        """
+        observations = np.array([])
+
+        # Actions 0 - 39
+        for i in range(40):
+            working_grid = grid.copy()
+            working_block = copy.deepcopy(block)
+
+            if not self.fall(i, working_grid, working_block):
+                observations[i] = self._get_observation(np.array(working_block.get_pixel_pos()), working_block.type)
+                continue
+            
+            landed_block_positions, landed_block_type = self.land(working_grid, working_block)
+            lines_cleared, cleared_row_idx = self.clear_rows(working_grid)
+
+            observations[i] = self._get_observation(block_positions=landed_block_positions, block_type=landed_block_type, lines_cleared=lines_cleared, cleared_row_idx=cleared_row_idx)
+
+        return observations
+
 
 # For if the user would like to play on their own
 if __name__ == "__main__":
