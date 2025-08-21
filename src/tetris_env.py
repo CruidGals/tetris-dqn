@@ -4,8 +4,8 @@ import copy
 from collections import deque
 from copy import deepcopy
 
-import mdp.utils as utils
-import mdp.observations as obs_terms
+import src.mdp.utils as utils
+import src.mdp.observations as obs_terms
 
 class Block:
     # Make each block an enum
@@ -334,20 +334,11 @@ class TetrisEnv(Tetris):
         
         return block_positions, block_type
 
+    def _fall(self, action):
+        """
+        Helper function to position the block correctly based on action and "place" the block into the fallen position
 
-    def step(self, action: int, prev_obs):
-        """ 
-        Perform the action, and return a ndarray in the form:
-        (obs, reward, terminated)
-
-        In TetrisEnv, an action is performed as picking a rotation for the block's orientation and a column for the block to fall in
-        Action is taken from a 40 dim one-hot vector where indices:
-        - 0-9: Column # with rotation 0
-        - 10-19: Column # with rotation 1
-        - 20-29: Column # with rotation 2
-        - 30-39: Column # with rotation 3
-
-        Previous observation is also taken to calculate the delta for rewards
+        Returns false if terminated
         """
 
         rows, cols = self.grid.shape
@@ -380,11 +371,33 @@ class TetrisEnv(Tetris):
         col_heights = np.where(np.any(selected_columns, axis=0), np.argmax(selected_columns, axis=0), rows)
 
         # If any blocks collide with already landed ones, terminate
-        if np.isin(block_positions[:, 0], col_heights).any():
-            return self._get_observation(block_positions, self.controlled_block.type), TetrisEnv.REWARDS["death"], True
+        if np.any(self.grid[block_positions[:, 0], block_positions[:, 1]] == '#'):
+            print(col_heights)
+            return False
         
         dy = min(col_heights - unique_pos[:, 0]) - 1
         self.controlled_block.pos = (int(self.controlled_block.pos[0] + dy), self.controlled_block.pos[1])
+        return True
+
+    def step(self, action: int, prev_obs):
+        """ 
+        Perform the action, and return a ndarray in the form:
+        (obs, reward, terminated)
+
+        In TetrisEnv, an action is performed as picking a rotation for the block's orientation and a column for the block to fall in
+        Action is taken from a 40 dim one-hot vector where indices:
+        - 0-9: Column # with rotation 0
+        - 10-19: Column # with rotation 1
+        - 20-29: Column # with rotation 2
+        - 30-39: Column # with rotation 3
+
+        Previous observation is also taken to calculate the delta for rewards
+        """
+
+        # Make the block fall in the column
+        if not self._fall(action):
+            print(action, self.grid, self.controlled_block.get_pixel_pos())
+            return self._get_observation(np.array(self.controlled_block.get_pixel_pos()), self.controlled_block.type), TetrisEnv.REWARDS['death'], True
 
         # Officially land block!
         landed_block_positions, landed_block_type = self.land()
@@ -466,58 +479,6 @@ class TetrisEnv(Tetris):
         reward += TetrisEnv.REWARDS['landing']     * d_obs[32]
 
         return reward
-    
-class HeuristicTetrisEnv(TetrisEnv):
-    def __init__(self, frame_rate=250):
-        super().__init__(frame_rate, True)
-
-    def find_best_move(self, curr_state, block):
-        self.reset()
-        self.grid = curr_state.copy()
-        prev_obs = self._get_observation()
-
-        best_action = 0
-        best_fitness = float("-inf")
-
-        # Find best move for each action
-        for i in range(40):
-            self.grid = curr_state.copy()
-            self.controlled_block = block
-
-            _, rew, done = self.step(i, prev_obs)
-
-            if done:
-                continue
-
-            if rew > best_fitness:
-                best_action = i
-                best_fitness = rew
-
-        return best_action
-
-    def _get_observation(self, block_positions=None, block_type=None, lines_cleared=0, cleared_row_idx=np.array([])):
-        rows, cols = self.grid.shape
-        bin_grid = utils.bin_grid(self.grid)
-
-        col_heights = obs_terms.height_per_column(bin_grid)
-        aggregate_height = col_heights.sum()
-        total_holes = obs_terms.holes_count(bin_grid).sum()
-        bumpiness = obs_terms.calc_bumpiness(col_heights)
-
-        return np.concatenate([
-            np.array([aggregate_height], dtype=np.float32),
-            np.array([total_holes], dtype=np.float32),
-            np.array([bumpiness], dtype=np.float32),
-        ])
-
-    def _get_reward(self, lines_cleared, d_obs):
-        """
-        Distribute the reward after a block lands (counts as one step in this environment),
-
-        Heuristic function inspired by:
-            L. Yiyuan. Tetris ai - the (near) perfect bot. https://codemyroad.wordpress.com/2013/04/14/tetris-ai-the-near-perfect-player/
-        """
-        return float(-0.510066 * d_obs[0] + 0.760666 * lines_cleared - 0.35663 * d_obs[1] - 0.184483 * d_obs[2])
 
 # For if the user would like to play on their own
 if __name__ == "__main__":

@@ -1,16 +1,11 @@
-import sys
-import os
-import copy
+import numpy as np
 import pygame as py
+from src.tetris_env import * 
+from src.pretraining.heuristic_env import HeuristicTetrisEnv
 
-# Add path of tetris env
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.join(current_dir, '..') 
-sys.path.append(parent_dir)
-from tetris_env import * 
-
-env = TetrisEnv(frame_rate=2, headless=False)
+env = TetrisEnv(frame_rate=2, headless=True)
 heuristic_env = HeuristicTetrisEnv()
+heuristic_env.reset()
 game_clock = py.time.Clock()
 
 obs = env.reset()
@@ -22,14 +17,14 @@ while running:
             running = False
 
     # Play what the hueristic env thinks is best
-    action = heuristic_env.find_best_move(env.grid.copy(), copy.deepcopy(env.controlled_block))
-    new, rew, done = env.step(action, obs)
-    print(rew)
+    action = heuristic_env.find_best_move(env.grid.copy(), np.concatenate([[env.controlled_block], list(env.block_queue)]), 0)
+    new, rew, done = env.step(action[0], obs)
+
     if done:
         running=False
 
     obs = new.copy()
     env.render()
-    game_clock.tick(1)
+    game_clock.tick(60)
 
 env.close()
