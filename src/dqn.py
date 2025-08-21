@@ -80,6 +80,8 @@ class DQNAgent:
         """
         Get the Q-value based on the weights of the model
         """
+        if np.random.rand() < self.epsilon:
+            return np.random.randint(0, self.action_size)
 
         with torch.no_grad():
             state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)

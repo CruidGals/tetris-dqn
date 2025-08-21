@@ -5,7 +5,7 @@ import numpy as np
 import os
 import copy
 from dqn import DQNAgent
-from tetris_env import TetrisEnv, HeuristicTetrisEnv
+from tetris_env import TetrisEnv
 
 def train(config):
     """
@@ -39,7 +39,6 @@ def train(config):
     )
 
     env = TetrisEnv(headless=(not config['training']['render']))
-    hueristic_env = HeuristicTetrisEnv()
     best_reward = -np.inf
     best_episode = 0
     best_episode_replay = None
@@ -67,10 +66,7 @@ def train(config):
 
             # Start the training process
             # Use hueristic model if less than epsilon, else use model parameters
-            if np.random.rand() < agent.epsilon:
-                action = hueristic_env.find_best_move(env.grid.copy(), copy.deepcopy(env.controlled_block))
-            else:
-                action = agent.act(state)
+            action = agent.act(state)
 
             # Capture step the env:
             obs, rew, term = env.step(action, state)
@@ -129,7 +125,7 @@ def run(args):
 # Run the DQN episodically
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input', type=str, default='hyperparams.yaml', help="Path to the yaml file for hyperparamaters")
+    parser.add_argument('-i', '--input', type=str, default='src/hyperparams.yaml', help="Path to the yaml file for hyperparamaters")
     args = parser.parse_args()
 
     run(args.input)
