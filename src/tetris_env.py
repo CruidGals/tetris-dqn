@@ -4,8 +4,8 @@ import copy
 from collections import deque
 from copy import deepcopy
 
-import src.mdp.utils as utils
-import src.mdp.observations as obs_terms
+import mdp.utils as utils
+import mdp.observations as obs_terms
 
 class Block:
     # Make each block an enum
@@ -372,7 +372,6 @@ class TetrisEnv(Tetris):
 
         # If any blocks collide with already landed ones, terminate
         if np.any(self.grid[block_positions[:, 0], block_positions[:, 1]] == '#'):
-            print(col_heights)
             return False
         
         dy = min(col_heights - unique_pos[:, 0]) - 1
@@ -396,7 +395,6 @@ class TetrisEnv(Tetris):
 
         # Make the block fall in the column
         if not self._fall(action):
-            print(action, self.grid, self.controlled_block.get_pixel_pos())
             return self._get_observation(np.array(self.controlled_block.get_pixel_pos()), self.controlled_block.type), TetrisEnv.REWARDS['death'], True
 
         # Officially land block!
