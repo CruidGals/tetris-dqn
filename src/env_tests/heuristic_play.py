@@ -3,7 +3,7 @@ import pygame as py
 from src.tetris_env import * 
 from src.pretraining.heuristic_env import HeuristicTetrisEnv
 
-env = TetrisEnv(frame_rate=2, headless=True)
+env = TetrisEnv(frame_rate=2, headless=False)
 heuristic_env = HeuristicTetrisEnv()
 heuristic_env.reset()
 game_clock = py.time.Clock()
