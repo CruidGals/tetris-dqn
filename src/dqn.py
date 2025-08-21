@@ -9,8 +9,10 @@ from torch.utils.tensorboard import SummaryWriter
 from model import DQNModel
 from collections import deque
 
+from replay_buffer import PERBuffer
+
 class DQNAgent:
-    def __init__(self, input=200, output=5, action_size=5, learning_rate=1e-4, weight_decay=1e-3, gamma=0.99, batch_size=256, replay_buffer_size=100000,
+    def __init__(self, input=26, output=14, action_size=14, learning_rate=1e-4, weight_decay=1e-3, gamma=0.99, batch_size=256, replay_buffer_size=100000,
                  min_buffer_before_training=5000, target_update=10, epsilon=1.0, epsilon_min=0.1, lr_gamma=0.5, lr_step_size=400, lr_end=0.00001, decay_rate=0.995):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.action_size = action_size
@@ -33,7 +35,7 @@ class DQNAgent:
         self.target_update_counter = 0
 
         # Instantiate replay memory
-        self.replay_memory = deque(maxlen=replay_buffer_size)
+        self.replay_buffer = PERBuffer(replay_buffer_size)
         self.min_buffer_before_training = min_buffer_before_training
 
         # NN stuff
@@ -72,7 +74,7 @@ class DQNAgent:
 
         Transition consists of (state, action, reward, next_state, done)
         """
-        self.replay_memory.append(transition)
+        self.replay_buffer.add(*transition)
 
     def act(self, state):
         """
@@ -89,31 +91,35 @@ class DQNAgent:
         """
         Train the policy network
         """
-        if len(self.replay_memory) < self.min_buffer_before_training:
+        if len(self.replay_buffer) < self.min_buffer_before_training:
             return
         
-        # Get a random batch and store them into tensors
-        batch = random.sample(self.replay_memory, self.batch_size)
+        # Get a batch of transitions and store them into tensors
+        batch, idx, is_weights = self.replay_buffer.sample(self.batch_size)
         states, actions, rewards, next_states, dones = zip(*batch)
 
+        # Convert to GPU-accelerated tensors
         states = torch.FloatTensor(np.array(states)).to(self.device)
         actions = torch.LongTensor(np.array(actions)).unsqueeze(1).to(self.device)
-        rewards = torch.FloatTensor(np.array(rewards)).to(self.device)
+        rewards = torch.FloatTensor(np.array(rewards)).unsqueeze(1).to(self.device)
         next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
-
-        # The "dones" array contains booleans that indicate whether if the next state stops the episode
-        dones = torch.FloatTensor(np.array(dones)).to(self.device)
+        dones = torch.FloatTensor(np.array(dones)).unsqueeze(1).to(self.device)
+        is_weights = torch.FloatTensor(np.array(is_weights)).unsqueeze(1).to(self.device) # Importance sampling weights
 
         curr_q_vals = self.model(states).gather(1, actions)
 
+        # Double dqn
         with torch.no_grad():
-            next_q_vals = self.target_model(next_states).max(1, keepdim=True)[0]
-            target_q_vals = rewards.unsqueeze(1) + (1 - dones.unsqueeze(1)) * self.gamma * next_q_vals
+            next_action = self.model(next_states).argmax(dim=1, keepdim=True)
+            next_q_vals = self.target_model(next_states).gather(1, next_action)
+            target_q_vals = rewards + (1 - dones) * self.gamma * next_q_vals
         
+        td_error = (curr_q_vals - target_q_vals).detach().cpu().numpy() # TD error for PER update
         loss = self.loss(curr_q_vals, target_q_vals)
+        loss = (is_weights * loss).mean()   # Apply the importance sampling to the loss
 
         # Write the loss to writer
-        self.writer.add_scalar('Loss/train', loss, self.training_step)
+        self.writer.add_scalar('Loss/train', loss.item(), self.training_step)
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -126,13 +132,16 @@ class DQNAgent:
         self.optimizer.step()
 
         # Update learning rate
-        if self.lr_scheduler.get_lr()[0] > self.lr_end:
-            self.lr_scheduler.step()
+        # if self.lr_scheduler.get_lr()[0] > self.lr_end:
+        #     self.lr_scheduler.step()
 
         # Increment x-axis for logs
         self.training_step += 1
 
-        return loss
+        # Update PER priorities
+        self.replay_buffer.update_priorities(idx, np.abs(td_error))
+
+        return loss.item()
     
     def save(self, path):
         torch.save(self.model.state_dict(), path)

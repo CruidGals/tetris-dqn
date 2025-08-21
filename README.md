@@ -16,6 +16,10 @@ The loss function I will be using is **Mean Squared Error Loss (MSE Loss)**, and
 
 Training will also rely on use of the **Bellman's Equation**, which tells us the value of transitioning into a certain state.
 
+Other sources/papers that have helped with the development of this project:
+- https://cs231n.stanford.edu/reports/2016/pdfs/121_Report.pdf
+- https://codemyroad.wordpress.com/2013/04/14/tetris-ai-the-near-perfect-player/
+
 ## To-Do List
 
 This is a tentative list of what I want to achieve with this project.

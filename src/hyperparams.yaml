@@ -1,26 +1,26 @@
 network:
-  input: 200
-  output: 5
+  input: 33
+  output: 40
 
 agent:
-  action_size: 5
+  action_size: 40
   learning_rate: 0.001 # -> 0.00001
-  weight_decay: 0.0001
+  weight_decay: 0
   gamma: 0.99
-  batch_size: 64
-  replay_buffer_size: 10000
+  batch_size: 128
+  replay_buffer_size: 50000
   min_buffer_before_training: 500
-  target_update_rate: 15
+  target_update_rate: 7
   epsilon: 1
   epsilon_min: 0.001
-  decay_rate: 0.998
+  decay_rate: 0.999
   lr_scheduler:
     gamma: 0.5
     step_size: 350
     lr_end: 0.00001
 
 training:
-  episodes: 2000
+  episodes: 10000
   max_episode_length: 30 # Max episode length in seconds
   render: False
 

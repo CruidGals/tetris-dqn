@@ -3,8 +3,9 @@ import argparse
 import time
 import numpy as np
 import os
+import copy
 from dqn import DQNAgent
-from tetris_env import Tetris
+from tetris_env import TetrisEnv
 
 def train(config):
     """
@@ -37,7 +38,7 @@ def train(config):
         decay_rate=config['agent']['decay_rate']
     )
 
-    env = Tetris(use_pygame=config['training']['render'])
+    env = TetrisEnv(headless=(not config['training']['render']))
     best_reward = -np.inf
     best_episode = 0
     best_episode_replay = None
@@ -49,11 +50,8 @@ def train(config):
         ep_loss = 0
         frame_count = 0
 
-        # Keep track of the states in this episode
-        episode_replay = [state]
-
-        # Accumulate rewards until landed
-        reward = 0
+        # Keep track of the states in this episode (replay is the first 200 dims)
+        episode_replay = [env.grid.copy()]
 
         # Run episode until max length of ~30 seconds
         start_time = time.time()
@@ -61,47 +59,31 @@ def train(config):
         max_time = config['training']['max_episode_length']
 
         while prev_time - start_time < max_time:
-            time.sleep(1./480.)
+            time.sleep(1 / 480)
             
             # Update current_time
             prev_time = time.time()
 
             # Start the training process
+            # Use hueristic model if less than epsilon, else use model parameters
             action = agent.act(state)
-            next_state = env.move(action)
 
-            # Store state in replay
-            episode_replay.append(next_state)
-
-            # Falling behavior (every 5 frames)
-            if frame_count % 2 == 0:
-                block_landed = env.fall()
-
-            env.clear_rows()
-            done = env.done
-
-            if done:
-                early_penalty = max(0, 20.0 - 1 * env.landed_block_count)
-                reward -= early_penalty
-            
-            if block_landed:
-                reward += env.distribute_reward()
-                agent.remember((state, action, reward, next_state, done))
-                total_reward += reward
-                reward = 0
+            # Capture step the env:
+            obs, rew, term = env.step(action, state)
+            episode_replay.append(env.grid.copy())
+            agent.remember((state, action, rew, obs, term))
+            total_reward += rew
 
             if config['training']['render']:
                 env.render()
 
-            if done:
+            if term:
                 break
 
-            # Train less frequently
-            if frame_count % 4 == 0:
-                loss = agent.train()
-                ep_loss += loss if loss else 0
+            loss = agent.train()
+            ep_loss += loss if loss else 0
             
-            state = next_state
+            state = obs
             frame_count += 1
 
         if total_reward > best_reward:
@@ -143,7 +125,7 @@ def run(args):
 # Run the DQN episodically
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input', type=str, default='hyperparams.yaml', help="Path to the yaml file for hyperparamaters")
+    parser.add_argument('-i', '--input', type=str, default='src/hyperparams.yaml', help="Path to the yaml file for hyperparamaters")
     args = parser.parse_args()
 
     run(args.input)
