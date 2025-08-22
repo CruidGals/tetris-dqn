@@ -69,7 +69,7 @@ def train(config):
             action = agent.act(state)
 
             # Capture step the env:
-            obs, rew, term = env.step(action, state)
+            obs, rew, term = env.step(action)
             episode_replay.append(env.grid.copy())
             agent.remember((state, action, rew, obs, term))
             total_reward += rew
