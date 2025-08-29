@@ -17,10 +17,10 @@ class AfterstateValueModel(nn.Module):
                                  nn.Linear(32, 1))
         
     def forward(self, X):
-        return self.net(X)
+        return self.net(X).squeeze(-1)
     
 class AfterstateValueNetwork:
-    def __init__(self, input, replay_buffer_cap, min_buffer_before_training, epsilon_start=1.0, epsilon_end = 1e-3, temperature=0.99, lr=1e-3, gamma=0.99, weight_decay = 1e-4):
+    def __init__(self, input, replay_buffer_cap, min_buffer_before_training, target_update, epsilon_start=1.0, epsilon_end = 1e-3, temperature=0.99, lr=1e-3, gamma=0.99, weight_decay = 1e-4):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # self.model updated every time, target model update every couple steps
@@ -28,20 +28,21 @@ class AfterstateValueNetwork:
 
         self.target_model = AfterstateValueModel(input).to(self.device)
         self.target_model.load_state_dict(self.model.state_dict())
-        self.target_update = 5
+        self.target_update = target_update
+        self.target_model.eval()
 
         self.replay_buffer = ExperienceReplay(replay_buffer_cap)
         self.min_buffer_before_training = min_buffer_before_training
 
         # Q network params
-        self.gamma = 0.99
+        self.gamma = gamma
         self.epsilon = epsilon_start
         self.epsilon_end = epsilon_end
         self.temperature = temperature
 
         # Network params
         self.loss = F.mse_loss
-        self.optimizer = optim.Adam(lr=lr, weight_decay=weight_decay)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
 
         # Loggers
         self.writer = SummaryWriter()
@@ -68,11 +69,9 @@ class AfterstateValueNetwork:
     # Overloaded functions
     def _possible_values(self, poss_obs: np.ndarray) -> torch.Tensor:
         """ Given possible observations, give the predicted value for each observation """
-        poss_obs_tensor = torch.tensor(poss_obs, device=self.device)
+        with torch.no_grad():
+            poss_obs_tensor = torch.as_tensor(poss_obs, dtype=torch.float32, device=self.device)
         return self.model(poss_obs_tensor)
-    
-    def _possible_values(self, poss_obs: torch.Tensor) -> torch.Tensor:
-        return self.model(poss_obs)
     
     # Training and updating
     def train(self):
@@ -95,13 +94,17 @@ class AfterstateValueNetwork:
 
         # Go through batches and make target_pred
         target_pred = []
-        for i in range(len(batch)):
-            if dones[i]:
-                target_pred.append(rewards[i])
-            else:
-                poss_obs = get_possible_obs(grid_after, next_block)
-                poss_vals = self._possible_values(poss_obs)
-                target_pred.append(rewards[i] + self.gamma * torch.max(poss_vals))
+        with torch.no_grad():
+            for i in range(len(batch)):
+                if dones[i]:
+                    target_pred.append(rewards[i])
+                else:
+                    poss_obs = get_possible_obs(grid_after, next_block)
+                    poss_vals = self._possible_values(poss_obs)
+                    a_star = int(torch.argmax(poss_vals))
+                    target_vals = self.target_model(torch.as_tensor(poss_vals, dtype=torch.float32, device=self.device))
+                    boot = target_vals[a_star]
+                    target_pred.append(rewards[i] + self.gamma * boot)
 
         target_pred = torch.stack(target_pred)
 
@@ -123,15 +126,17 @@ class AfterstateValueNetwork:
         self.optimizer.step()
         self.training_step += 1
 
-        if self.training_step % 5 == 0:
-            self._update()
+        # Update the parameters
+        self._update()
 
         return loss.item()
     
     def _update(self):
         """ Updates the training model and decreases epsilon """
-        self.target_model.load_state_dict(self.model.state_dict())
-        self.epsilon = max(self.epsilon_min, self.epsilon * self.decay_rate)
+        if self.training_step % self.target_update == 0:
+            self.target_model.load_state_dict(self.model.state_dict())
+        
+        self.epsilon = max(self.epsilon_end, self.epsilon * self.decay_rate)
 
     # Saving and loading model
     def save(self, path):
