@@ -27,4 +27,5 @@ training:
 evaluation:
   episodes: 50
   max_episode_length: 60
+  model_path: results/models/2025090612/model_4000.pth
   render: True
