@@ -3,39 +3,34 @@ import argparse
 import time
 import numpy as np
 import os
-import copy
-from dqn import DQNAgent
+from afterstate_model import AfterstateValueNetwork
 from tetris_env import TetrisEnv
+from mdp.env import get_possible_obs
 
 def train(config):
     """
     Train the agent based on the hyperparameters
     """
     timestamp = time.strftime('%Y%m%d%H')
-    result_dir = os.path.join('results/models', f"experiment_{timestamp}")
+    result_dir = os.path.join('results/models', f"{timestamp}")
     os.makedirs(result_dir, exist_ok=True)
 
     # Save config file
     with open(os.path.join(result_dir, 'config.yaml'), 'w') as f:
         yaml.dump(config, f)
-
-    agent = DQNAgent(
+    
+    agent = AfterstateValueNetwork(
         input=config['network']['input'],
-        output=config['network']['output'],
-        action_size=config['agent']['action_size'],
-        learning_rate=config['agent']['learning_rate'],
-        weight_decay=config['agent']['weight_decay'],
-        gamma=config['agent']['gamma'],
         batch_size=config['agent']['batch_size'],
-        replay_buffer_size=config['agent']['replay_buffer_size'],
+        replay_buffer_cap=config['agent']['replay_buffer_size'],
         min_buffer_before_training=config['agent']['min_buffer_before_training'],
         target_update=config['agent']['target_update_rate'],
-        epsilon=config['agent']['epsilon'],
-        epsilon_min=config['agent']['epsilon_min'],
-        lr_gamma=config['agent']['lr_scheduler']['gamma'],
-        lr_step_size=config['agent']['lr_scheduler']['step_size'],
-        lr_end=config['agent']['lr_scheduler']['lr_end'],
-        decay_rate=config['agent']['decay_rate']
+        epsilon_start=config['agent']['epsilon'],
+        epsilon_end=config['agent']['epsilon_min'],
+        temperature=config['agent']['decay_rate'],
+        lr=config['agent']['learning_rate'],
+        gamma=config['agent']['gamma'],
+        weight_decay=config['agent']['weight_decay']
     )
 
     env = TetrisEnv(headless=(not config['training']['render']))
@@ -45,6 +40,7 @@ def train(config):
 
     # Begin training
     for i in range(config['training']['episodes']):
+        # Initialize episode
         state = env.reset()
         total_reward = 0
         ep_loss = 0
@@ -59,19 +55,18 @@ def train(config):
         max_time = config['training']['max_episode_length']
 
         while prev_time - start_time < max_time:
-            time.sleep(1 / 480)
+            # time.sleep(1 / 480)
             
             # Update current_time
             prev_time = time.time()
 
             # Start the training process
-            # Use hueristic model if less than epsilon, else use model parameters
-            action = agent.act(state)
+            action = agent.act(get_possible_obs(env.grid, env.controlled_block))
 
             # Capture step the env:
             obs, rew, term = env.step(action)
             episode_replay.append(env.grid.copy())
-            agent.remember((state, action, rew, obs, term))
+            agent.remember(env.grid.copy(), obs, rew, env.controlled_block, term)
             total_reward += rew
 
             if config['training']['render']:
@@ -79,9 +74,6 @@ def train(config):
 
             if term:
                 break
-
-            loss = agent.train()
-            ep_loss += loss if loss else 0
             
             state = obs
             frame_count += 1
@@ -91,8 +83,8 @@ def train(config):
             best_episode = i + 1
             best_episode_replay = episode_replay
 
-        # Update the epsilon and critic model after every episode
-        agent.update()
+        loss = agent.train()
+        ep_loss += loss if loss is not None else 0
 
         print(f"Episode: {i+1}; Avg Reward: {(total_reward / env.landed_block_count):.3f}; Epsilon: {agent.epsilon:.3f}; Landed: {env.landed_block_count}; Loss/per: {(ep_loss / env.landed_block_count):.2f}; Cleared: {env.rows_cleared}")
         

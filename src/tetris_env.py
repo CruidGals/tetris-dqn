@@ -315,7 +315,7 @@ class TetrisEnv(Tetris):
 
         # Officially land block!
         landed_block_positions, landed_block_type = env_funcs.land(self.grid, self.controlled_block)
-        lines_cleared, cleared_row_idx = env_funcs.clear_rows(self.grid)
+        self.grid, lines_cleared, cleared_row_idx = env_funcs.clear_rows(self.grid)
         self.cycle_block()
         self.landed_block_count += 1
         self.rows_cleared += lines_cleared

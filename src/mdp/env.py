@@ -18,9 +18,7 @@ def clear_rows(grid):
         new_rows = np.full((lines_cleared, cleared_grid.shape[1]), fill_value='.', dtype=cleared_grid.dtype)
         cleared_grid = np.vstack((new_rows, cleared_grid))
 
-    grid = cleared_grid
-
-    return lines_cleared, cleared_row_idx
+    return cleared_grid, lines_cleared, cleared_row_idx
 
 def land( grid: np.ndarray, block):
     """
@@ -45,8 +43,8 @@ def _get_observation(grid, block_positions, block_type, lines_cleared=0, cleared
     # Get all terms (normalize if need be)
     block_type = utils.one_hot(7, block_type)
     col_heights = obs_terms.height_per_column(bin_grid)
-    col_heights_norm = col_heights / 20
-    holes_per_col = (obs_terms.holes_count(bin_grid) / col_heights if col_heights.all() > 0 else np.zeros(10))
+    aggregate_height = col_heights.sum() / (20 * 10)
+    holes = obs_terms.holes_count(bin_grid).sum() / (20 * 10)
     bumpiness = obs_terms.calc_bumpiness(col_heights) / (rows * (cols - 1))
     row_transitions, col_transitions = obs_terms.count_transitions(bin_grid)
     row_transitions /= (rows * (cols + 1))
@@ -58,8 +56,8 @@ def _get_observation(grid, block_positions, block_type, lines_cleared=0, cleared
     # Return observation concatenated altogether
     return np.concatenate([
         block_type.astype(np.float32),
-        col_heights_norm.astype(np.float32),
-        holes_per_col.astype(np.float32),
+        np.array([aggregate_height], dtype=np.float32),
+        np.array([holes], dtype=np.float32),
         np.array([bumpiness], dtype=np.float32),
         np.array([row_transitions], dtype=np.float32),
         np.array([col_transitions], dtype=np.float32),
@@ -83,7 +81,7 @@ def get_possible_obs(grid: np.ndarray, block):
     For each possible action, return the observation once the action has been made.
     The index in the observations array correspond to the action made
     """
-    observations = np.array([])
+    observations = []
 
     # Actions 0 - 39
     for i in range(40):
@@ -91,15 +89,15 @@ def get_possible_obs(grid: np.ndarray, block):
         working_block = copy.deepcopy(block)
 
         if not fall(i, working_grid, working_block):
-            observations[i] = _get_observation(np.array(working_block.get_pixel_pos()), working_block.type)
+            observations.append(_get_observation(working_grid, np.array(working_block.get_pixel_pos()), working_block.type))
             continue
         
         landed_block_positions, landed_block_type = land(working_grid, working_block)
-        lines_cleared, cleared_row_idx = clear_rows(working_grid)
+        working_grid, lines_cleared, cleared_row_idx = clear_rows(working_grid)
 
-        observations[i] = _get_observation(block_positions=landed_block_positions, block_type=landed_block_type, lines_cleared=lines_cleared, cleared_row_idx=cleared_row_idx)
+        observations.append(_get_observation(working_grid, block_positions=landed_block_positions, block_type=landed_block_type, lines_cleared=lines_cleared, cleared_row_idx=cleared_row_idx))
 
-    return observations
+    return np.array(observations)
 
 def fall(action, grid: np.ndarray, block):
     """
@@ -111,10 +109,9 @@ def fall(action, grid: np.ndarray, block):
     rows, cols = grid.shape
 
     # Parse action information: Tens digit is rotation, Ones digit is column number
-    action_temp = str(action)
-    rotation = int(action_temp[0]) if len(action_temp) > 1 else 0
-    column = int(action_temp[1]) if len(action_temp) > 1 else int(action_temp[0])
-    
+    rotation = action // 10
+    column = action % 10
+
     # Position the block
     block.rotation = rotation
     block.pos = (block.pos[0], column)
@@ -126,6 +123,9 @@ def fall(action, grid: np.ndarray, block):
 
     # Update block position
     block_positions = np.array(block.get_pixel_pos())
+    if np.any(block_positions[:, 0] < 0) or np.any(block_positions[:, 0] >= rows) or \
+       np.any(block_positions[:, 1] < 0) or np.any(block_positions[:, 1] >= cols):
+        return False
 
     # Get highest row pos for each column the block is in
     cols = block_positions[:,  1]

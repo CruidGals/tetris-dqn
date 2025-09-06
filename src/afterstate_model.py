@@ -20,7 +20,7 @@ class AfterstateValueModel(nn.Module):
         return self.net(X).squeeze(-1)
     
 class AfterstateValueNetwork:
-    def __init__(self, input, replay_buffer_cap, min_buffer_before_training, target_update, epsilon_start=1.0, epsilon_end = 1e-3, temperature=0.99, lr=1e-3, gamma=0.99, weight_decay = 1e-4):
+    def __init__(self, input, batch_size, replay_buffer_cap, min_buffer_before_training, target_update, epsilon_start=1.0, epsilon_end = 1e-3, temperature=0.99, lr=1e-3, gamma=0.99, weight_decay = 1e-4):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # self.model updated every time, target model update every couple steps
@@ -43,6 +43,7 @@ class AfterstateValueNetwork:
         # Network params
         self.loss = F.mse_loss
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
+        self.batch_size = batch_size
 
         # Loggers
         self.writer = SummaryWriter()
@@ -85,9 +86,9 @@ class AfterstateValueNetwork:
         grid_after, obs_after, rewards, next_block, dones = zip(*batch)
 
         # Convert them into tensors (except next_block)
-        obs_after = torch.FloatTensor(np.array(obs_after), device=self.device)
-        rewards = torch.FloatTensor(np.array(rewards), device=self.device)
-        dones = torch.BoolTensor(np.array(dones), device=self.device)
+        obs_after = torch.tensor(np.array(obs_after), dtype=torch.float32, device=self.device)
+        rewards = torch.tensor(np.array(rewards), dtype=torch.float32, device=self.device)
+        dones = torch.tensor(np.array(dones), dtype=torch.bool, device=self.device)
 
         # Predicted values
         curr_pred = self.model(obs_after)
@@ -99,11 +100,11 @@ class AfterstateValueNetwork:
                 if dones[i]:
                     target_pred.append(rewards[i])
                 else:
-                    poss_obs = get_possible_obs(grid_after, next_block)
-                    poss_vals = self._possible_values(poss_obs)
-                    a_star = int(torch.argmax(poss_vals))
-                    target_vals = self.target_model(torch.as_tensor(poss_vals, dtype=torch.float32, device=self.device))
-                    boot = target_vals[a_star]
+                    poss_obs = torch.as_tensor(get_possible_obs(grid_after[i], next_block[i]), dtype=torch.float32, device=self.device)
+                    poss_vals = self.target_model(poss_obs)
+                    best_action = int(torch.argmax(poss_vals))
+                    target_vals = self.target_model(poss_obs)
+                    boot = target_vals[best_action]
                     target_pred.append(rewards[i] + self.gamma * boot)
 
         target_pred = torch.stack(target_pred)
@@ -136,7 +137,7 @@ class AfterstateValueNetwork:
         if self.training_step % self.target_update == 0:
             self.target_model.load_state_dict(self.model.state_dict())
         
-        self.epsilon = max(self.epsilon_end, self.epsilon * self.decay_rate)
+        self.epsilon = max(self.epsilon_end, self.epsilon * self.temperature)
 
     # Saving and loading model
     def save(self, path):

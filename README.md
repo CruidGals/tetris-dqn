@@ -1,20 +1,19 @@
 # Tetris Reinforcement Learning
 
-Using pytorch and pygame, I am creating a Deep Q-Learning Network (DQN) to learn how to play Tetris. The tetris game will
-be built from scratch using pygame, and the DQN will be created through pytorch and Q-table practices. I will also be
-implementing a regular Q-Learning network to compare the two performances on this classic game of tetris.
+Using PyTorch and Pygame, I am creating a Deep Reinforcement Learning Network to learn how to play Tetris. Unlike a classic DQN, which takes in a state and returns the action with the highest Q-Value, I've created the **Afterstate Model**, which parses through all the actions and returns the action which returns the best next state.
 
 ## Network Architecture and Motivation
 
-DQN will be implemented based on [Minh et al.'s](https://web.stanford.edu/class/psych209/Readings/MnihEtAlHassibis15NatureControlDeepRL.pdf) paper. 
+Before, I tried using a classic DQN will be implemented based on [Minh et al.'s](https://web.stanford.edu/class/psych209/Readings/MnihEtAlHassibis15NatureControlDeepRL.pdf) paper. However, through multiple efforts and interations of this model, the AI simply wouldn't learn. Through further research, I found that **predicting the best action based on the current tetris grid state was not feasible**. I needed the network to *lookahead*, to observe all actions in the action space to see which yields the best board state going forward. For this, I created the **Afterstate Model**.
 
-It utilizes both a **policy network** and a **target network**. The **policy network** acts as the "Q-Table," being used to select actions during training, evaluation, and testing. It updates frequently to factor in new experiences after each episode. The **target network** is known as the *training stabilizer* as it carries a delayed copy of the policy network to help compute target Q-values in the loss function for training. It updates every *C* episodes, introducing another hyperparameter for the user to test.
+The **Afterstate Model** takes in the current board state and outputs the action that gives the best next state. Training looks a little like this:
+- **Act**: Based on the current model parameters, the model predicts (what it thinks is) the best action based on the current board state. It does this by trying every action internally to see which action gives the best next board state according to the model.
+- **Step**: The AI performs that action and puts new board state and observations into the replay buffer, along with rewards, the next block after queue, and the termination state.
+- **Train**: During model training, the model takes a batch of these replay transitions. For each transition in the batch, the target model attempts to find what it thinks is the **next best action**, and applies the **Bellman's Equation** to get the expected return value of the action. It then compares that with the current values of the model, and updates the weights accordingly as a normal DQN would.
 
-Each model will have 2 convolutional layers, one to motivate the detect the current environment state and the other to predict the motion of the falling piece. Then it will converge onto four linear layers to output an action.
+Treat this neural network as a mix of a **DQN** paired with an afterstate value function. I am still estimating the best action to choose based on the current state, using a **replay buffer** to train the model, simulating exploration with an epsilon greedy policy, and training a target network for stable updates. The **Afterstate Value Function** is used to determine how favorable each action is.
 
-The loss function I will be using is **Mean Squared Error Loss (MSE Loss)**, and the optimizer I will use is **Adam** optimizer.
-
-Training will also rely on use of the **Bellman's Equation**, which tells us the value of transitioning into a certain state.
+The loss function I will be using is **Mean Squared Error Loss (MSE Loss)**, and the optimizer I will use is **Adam** optimizer. A list of other hyperparameters that I used are in `src/hyperparameters.yaml`.
 
 Other sources/papers that have helped with the development of this project:
 - https://cs231n.stanford.edu/reports/2016/pdfs/121_Report.pdf
