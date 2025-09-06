@@ -1,4 +1,5 @@
 import random
+from collections import deque
 
 class SumTree:
     def __init__(self, capacity: int):
@@ -111,3 +112,20 @@ class PERBuffer:
 
     def __len__(self):
         return self.tree.size
+    
+class ExperienceReplay:
+    """
+    Classic implementation of an experience replay buffer
+    """
+
+    def __init__(self, size):
+        self.buffer = deque(maxlen=size)
+
+    def add(self, grid_after, obs_after, reward, next_block, done):
+        self.buffer.append((grid_after, obs_after, reward, next_block, done))
+
+    def sample(self, batch_size):
+        return random.sample(self.buffer, batch_size)
+
+    def __len__(self):
+        return len(self.buffer)
