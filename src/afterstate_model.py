@@ -20,7 +20,7 @@ class AfterstateValueModel(nn.Module):
         return self.net(X).squeeze(-1)
     
 class AfterstateValueNetwork:
-    def __init__(self, input, batch_size, replay_buffer_cap, min_buffer_before_training, target_update, epsilon_start=1.0, epsilon_end = 1e-3, temperature=0.99, lr=1e-3, gamma=0.99, weight_decay = 1e-4):
+    def __init__(self, input, batch_size, replay_buffer_cap, min_buffer_before_training, target_update, epsilon_start=1.0, epsilon_end = 1e-3, temperature=0.99, lr=1e-3, gamma=0.99, weight_decay = 1e-4, max_grad_norm=5.0):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # self.model updated every time, target model update every couple steps
@@ -44,6 +44,7 @@ class AfterstateValueNetwork:
         self.loss = F.mse_loss
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
         self.batch_size = batch_size
+        self.max_grad_norm = max_grad_norm
 
         # Loggers
         self.writer = SummaryWriter()
@@ -102,12 +103,10 @@ class AfterstateValueNetwork:
                 else:
                     poss_obs = torch.as_tensor(get_possible_obs(grid_after[i], next_block[i]), dtype=torch.float32, device=self.device)
                     poss_vals = self.target_model(poss_obs)
-                    best_action = int(torch.argmax(poss_vals))
-                    target_vals = self.target_model(poss_obs)
-                    boot = target_vals[best_action]
+                    boot = torch.max(poss_vals)
                     target_pred.append(rewards[i] + self.gamma * boot)
 
-        target_pred = torch.stack(target_pred)
+        target_pred = torch.stack(target_pred).to(self.device)
 
         # Compute loss
         loss = self.loss(curr_pred, target_pred)
@@ -119,6 +118,9 @@ class AfterstateValueNetwork:
         self.optimizer.zero_grad()
         loss.backward()
 
+        # Clip gradients
+        # torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
+
         # Write gradient to writer
         for name, param in self.model.named_parameters():
             if param.grad is not None:
@@ -129,6 +131,7 @@ class AfterstateValueNetwork:
 
         # Update the parameters
         self._update()
+        self.update_epsilon()
 
         return loss.item()
     
@@ -137,7 +140,10 @@ class AfterstateValueNetwork:
         if self.training_step % self.target_update == 0:
             self.target_model.load_state_dict(self.model.state_dict())
         
+    def update_epsilon(self):
+        """ Decrease epsilon after each episode """
         self.epsilon = max(self.epsilon_end, self.epsilon * self.temperature)
+        self.writer.add_scalar('Epsilon', self.epsilon, self.training_step)
 
     # Saving and loading model
     def save(self, path):

@@ -1,7 +1,7 @@
 import numpy as np
-import copy
 import mdp.utils as utils
 import mdp.observations as obs_terms
+from block import BlockFuncs
 
 def clear_rows(grid):
     cleared_row_idx = np.where(np.all(grid == '#', axis=1))[0]
@@ -20,16 +20,15 @@ def clear_rows(grid):
 
     return cleared_grid, lines_cleared, cleared_row_idx
 
-def land( grid: np.ndarray, block):
+def land(grid: np.ndarray, block: np.ndarray):
     """
     Modified fall function that lands the block immediately.
     Returns the landed block positions
     """
-    block_type = block.type
-    block_positions = np.array(block.get_pixel_pos())
+    block_positions = np.array(BlockFuncs.get_pixel_pos(block), dtype=int)
     grid[block_positions[:, 0], block_positions[:, 1]] = '#'
     
-    return block_positions, block_type
+    return block_positions, block[0]
 
 def _get_observation(grid, block_positions, block_type, lines_cleared=0, cleared_row_idx=np.array([])):
     """
@@ -76,7 +75,7 @@ def _get_reward(lines_cleared, obs):
 
     return reward
 
-def get_possible_obs(grid: np.ndarray, block):
+def get_possible_obs(grid: np.ndarray, block: np.ndarray):
     """
     For each possible action, return the observation once the action has been made.
     The index in the observations array correspond to the action made
@@ -86,10 +85,10 @@ def get_possible_obs(grid: np.ndarray, block):
     # Actions 0 - 39
     for i in range(40):
         working_grid = grid.copy()
-        working_block = copy.deepcopy(block)
+        working_block = block.copy()
 
         if not fall(i, working_grid, working_block):
-            observations.append(_get_observation(working_grid, np.array(working_block.get_pixel_pos()), working_block.type))
+            observations.append(_get_observation(working_grid, np.array(BlockFuncs.get_pixel_pos(working_block), dtype=int), working_block[0]))
             continue
         
         landed_block_positions, landed_block_type = land(working_grid, working_block)
@@ -97,13 +96,14 @@ def get_possible_obs(grid: np.ndarray, block):
 
         observations.append(_get_observation(working_grid, block_positions=landed_block_positions, block_type=landed_block_type, lines_cleared=lines_cleared, cleared_row_idx=cleared_row_idx))
 
-    return np.array(observations)
+    return np.stack(observations)
 
-def fall(action, grid: np.ndarray, block):
+def fall(action, grid: np.ndarray, block: np.ndarray):
     """
     Helper function to position the block correctly based on action and "place" the block into the fallen position
 
     Returns false if terminated
+    block: Numpy array in form [block_type, rotation, row, col]
     """
 
     rows, cols = grid.shape
@@ -113,18 +113,24 @@ def fall(action, grid: np.ndarray, block):
     column = action % 10
 
     # Position the block
-    block.rotation = rotation
-    block.pos = (block.pos[0], column)
+    block[1] = rotation
+    block[3] = column
 
     # Handle case: block goes out of bound if placed in certain column
-    block_position_cols = np.array(block.get_pixel_pos(), dtype=int)[:, 1]
+    block_position_cols = np.array(BlockFuncs.get_pixel_pos(block), dtype=int)[:, 1]
     overflow = min(0, block_position_cols.min()) + max(0, block_position_cols.max() - (cols - 1))
-    block.pos = (block.pos[0], int(block.pos[1] - overflow))
+    block[3] = int(block[3] - overflow)
 
     # Update block position
-    block_positions = np.array(block.get_pixel_pos())
+    block_positions = np.array(BlockFuncs.get_pixel_pos(block), dtype=int)
+
+    # Bounds check
     if np.any(block_positions[:, 0] < 0) or np.any(block_positions[:, 0] >= rows) or \
        np.any(block_positions[:, 1] < 0) or np.any(block_positions[:, 1] >= cols):
+        return False
+    
+    # If any blocks collide with already landed ones, terminate
+    if np.any(grid[block_positions[:, 0], block_positions[:, 1]] == '#'):
         return False
 
     # Get highest row pos for each column the block is in
@@ -136,11 +142,8 @@ def fall(action, grid: np.ndarray, block):
     # Get col heights (inverted)
     selected_columns = grid[:, unique_cols[0]:unique_cols[-1] + 1] == '#'
     col_heights = np.where(np.any(selected_columns, axis=0), np.argmax(selected_columns, axis=0), rows)
-
-    # If any blocks collide with already landed ones, terminate
-    if np.any(grid[block_positions[:, 0], block_positions[:, 1]] == '#'):
-        return False
     
     dy = min(col_heights - unique_pos[:, 0]) - 1
-    block.pos = (int(block.pos[0] + dy), block.pos[1])
+    block[2] += int(dy)
+
     return True

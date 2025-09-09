@@ -30,7 +30,8 @@ def train(config):
         temperature=config['agent']['decay_rate'],
         lr=config['agent']['learning_rate'],
         gamma=config['agent']['gamma'],
-        weight_decay=config['agent']['weight_decay']
+        weight_decay=config['agent']['weight_decay'],
+        max_grad_norm=config['agent']['max_grad_norm']
     )
 
     env = TetrisEnv(headless=(not config['training']['render']))
@@ -60,12 +61,12 @@ def train(config):
             prev_time = time.time()
 
             # Start the training process
-            action = agent.act(get_possible_obs(env.grid, env.controlled_block))
+            action = agent.act(get_possible_obs(env.grid, env.block))
 
             # Capture step the env:
             obs, rew, term = env.step(action)
             episode_replay.append(env.grid.copy())
-            agent.remember(env.grid.copy(), obs, rew, env.controlled_block, term)
+            agent.remember(env.grid.copy(), obs, rew, env.block.copy(), term)
             total_reward += rew
 
             if config['training']['render']:
@@ -73,8 +74,6 @@ def train(config):
 
             if term:
                 break
-            
-            state = obs
 
         # Save the best replay
         if total_reward > best_reward:
@@ -82,10 +81,8 @@ def train(config):
             best_episode = i + 1
             best_episode_replay = episode_replay
 
-        # Do 5 training bursts after every episode
-        for _ in range(5):
-            loss = agent.train()
-            ep_loss += loss if loss is not None else 0
+        loss = agent.train()
+        ep_loss += loss if loss is not None else 0
 
         # Print episode information
         print(f"Episode: {i+1}; Avg Reward: {(total_reward / env.landed_block_count):.3f}; Epsilon: {agent.epsilon:.3f}; Landed: {env.landed_block_count}; Loss/per: {(ep_loss / env.landed_block_count):.2f}; Cleared: {env.rows_cleared}")
@@ -140,7 +137,7 @@ def test(config, agent: AfterstateValueNetwork):
         while prev_time - start_time < max_time:
             prev_time = time.time()
 
-            action = agent.act(get_possible_obs(env.grid, env.controlled_block))
+            action = agent.act(get_possible_obs(env.grid, env.block))
             obs, rew, term = env.step(action)
             episode_replay.append(env.grid.copy())
             total_reward += rew
@@ -150,8 +147,6 @@ def test(config, agent: AfterstateValueNetwork):
 
             if term:
                 break
-            
-            state = obs
 
         if total_reward > best_reward:
             best_reward = total_reward

@@ -4,28 +4,25 @@ network:
 
 agent:
   action_size: 40
-  learning_rate: 0.001 # -> 0.00001
+  learning_rate: 0.0005 # -> 0.00001
   weight_decay: 0
   gamma: 0.99
-  batch_size: 128
-  replay_buffer_size: 50000
-  min_buffer_before_training: 500
+  batch_size: 256
+  replay_buffer_size: 100000
+  min_buffer_before_training: 5000
   target_update_rate: 7
   epsilon: 1
   epsilon_min: 0.001
-  decay_rate: 0.999
-  lr_scheduler:
-    gamma: 0.5
-    step_size: 350
-    lr_end: 0.00001
+  decay_rate: 0.998
+  max_grad_norm: 5.0
 
 training:
-  episodes: 10000
+  episodes: 3000
   max_episode_length: 30 # Max episode length in seconds
   render: False
 
 evaluation:
   episodes: 50
   max_episode_length: 60
-  model_path: results/models/2025090612/model_4000.pth
+  model_path: results/models/2025090716/model_3000.pth
   render: True

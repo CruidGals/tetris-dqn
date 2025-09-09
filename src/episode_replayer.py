@@ -1,7 +1,6 @@
 import numpy as np
 import argparse
 import pygame as py
-from tetris_env import Tetris
 
 def replay(arr):
     # Make into iterator for easy access
@@ -39,7 +38,7 @@ def replay(arr):
 
         py.display.flip()
 
-        game_clock.tick(2)
+        game_clock.tick(15)
 
     py.quit()
 
